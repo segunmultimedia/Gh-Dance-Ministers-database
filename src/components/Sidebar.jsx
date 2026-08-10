@@ -18,7 +18,6 @@ export default function Sidebar({ activeTab, setActiveTab, counts, adminUser, on
   const menuGeneral = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'members', label: 'Members', icon: Users, badge: counts.members },
-    { id: 'birthdays', label: 'Birthdays', icon: Cake, badge: counts.birthdaysToday, isAlert: counts.birthdaysToday > 0 },
   ];
 
   const menuTools = [
