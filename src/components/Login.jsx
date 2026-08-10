@@ -8,8 +8,8 @@ export default function Login({ onLoginSuccess }) {
   const [error, setError] = useState('');
 
   const handleFillDemo = () => {
-    setEmail('admin@organization.org');
-    setPassword('admin123');
+    setEmail('segunmultimedia@gmail.com');
+    setPassword('adminlogin');
     setError('');
   };
 
@@ -20,15 +20,15 @@ export default function Login({ onLoginSuccess }) {
       return;
     }
 
-    // Authenticate admin demo credentials
-    if (email === 'admin@organization.org' && password === 'admin123') {
+    // Authenticate admin credentials
+    if (email === 'segunmultimedia@gmail.com' && password === 'adminlogin') {
       onLoginSuccess({
-        name: 'Hecham GAZHI',
-        email: 'hechamgazhi@gmail.com',
+        name: 'Segun Multimedia',
+        email: 'segunmultimedia@gmail.com',
         role: 'System Administrator'
       });
     } else {
-      // Allow any non-empty demo login for flexibility
+      // Allow any non-empty login for flexibility
       onLoginSuccess({
         name: email.split('@')[0] || 'Administrator',
         email: email,
@@ -72,7 +72,7 @@ export default function Login({ onLoginSuccess }) {
           </p>
         </div>
 
-        {/* Demo Quick Fill Box */}
+        {/* Quick Access Box */}
         <div style={{
           background: 'var(--primary-light)',
           border: '1px solid #c7d2fe',
@@ -84,8 +84,8 @@ export default function Login({ onLoginSuccess }) {
           justifyContent: 'space-between'
         }}>
           <div>
-            <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--primary)' }}>DEMO ACCESS</div>
-            <div style={{ fontSize: '0.8rem', color: '#3730a3' }}>admin@organization.org / admin123</div>
+            <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--primary)' }}>QUICK ACCESS</div>
+            <div style={{ fontSize: '0.8rem', color: '#3730a3' }}>segunmultimedia@gmail.com / adminlogin</div>
           </div>
           <button 
             type="button" 
@@ -120,7 +120,7 @@ export default function Login({ onLoginSuccess }) {
                 type="email"
                 className="form-control"
                 style={{ paddingLeft: '2.5rem' }}
-                placeholder="admin@organization.org"
+                placeholder="segunmultimedia@gmail.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
