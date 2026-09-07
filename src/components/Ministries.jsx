@@ -1,283 +1,174 @@
 import React, { useState, useMemo } from 'react';
-import { Search, MapPin, Users, Crown, Edit3, Power, Eye, Building2, Plus, LayoutGrid, List } from 'lucide-react';
-import { GHANA_REGIONS } from '../utils/constants';
-import { getMinistryLeaders, getMinistryMemberCount } from '../services/dataService';
+import { Plus, LayoutGrid, List, Eye, Edit3, Trash2, MapPin, Users, MoreVertical } from 'lucide-react';
+import { canDeleteMinistry, getMinistryLeaders } from '../services/dataService';
 
-export default function Ministries({ 
-  ministries, 
-  memberships, 
-  dancers, 
-  onAddMinistry, 
-  onEditMinistry, 
-  onViewMinistry,
-  onUpdateMinistryStatus 
-}) {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [regionFilter, setRegionFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('active');
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'table'
+export default function Ministries({ ministries, dancers, memberships, onAddMinistry, onEditMinistry, onViewMinistry, onDeleteMinistry, searchTerm }) {
+  const [viewMode, setViewMode] = useState('table');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [activeMenuId, setActiveMenuId] = useState(null);
 
   const filteredMinistries = useMemo(() => {
     return ministries.filter(m => {
-      const matchSearch = m.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         (m.church && m.church.toLowerCase().includes(searchTerm.toLowerCase()));
-      const matchRegion = regionFilter ? m.region === regionFilter : true;
+      const matchSearch = m.name.toLowerCase().includes((searchTerm || '').toLowerCase()) || 
+                          (m.town && m.town.toLowerCase().includes((searchTerm || '').toLowerCase()));
       const matchStatus = statusFilter ? m.status === statusFilter : true;
-      return matchSearch && matchRegion && matchStatus;
+      return matchSearch && matchStatus;
     });
-  }, [ministries, searchTerm, regionFilter, statusFilter]);
+  }, [ministries, searchTerm, statusFilter]);
 
-  const activeMinistries = ministries.filter(m => m.status === 'active').length;
-  const regionsCovered = new Set(ministries.map(m => m.region)).size;
-
-  const resetFilters = () => {
-    setSearchTerm('');
-    setRegionFilter('');
-    setStatusFilter('');
-  };
-
-  const handleDeactivate = async (ministry) => {
-    const newStatus = ministry.status === 'active' ? 'inactive' : 'active';
-    const confirmMsg = newStatus === 'inactive' 
-      ? `Are you sure you want to deactivate ${ministry.name}? Members will still exist but the ministry will be hidden from primary lists.`
-      : `Reactivate ${ministry.name}?`;
-      
-    if (window.confirm(confirmMsg)) {
-      await onUpdateMinistryStatus(ministry.id, newStatus);
+  const handleDelete = (ministry) => {
+    if (canDeleteMinistry(ministry.id, memberships)) {
+      if (window.confirm(`Are you sure you want to delete ${ministry.name}?`)) onDeleteMinistry(ministry);
+    } else {
+      alert(`Cannot delete ${ministry.name} because it has assigned dancers. Deactivate it or reassign dancers first.`);
     }
+    setActiveMenuId(null);
   };
 
   return (
-    <div className="d-flex flex-column gap-4">
-      
-      {/* Page Header */}
-      <div className="page-header">
-        <div>
-          <h1 className="page-header-title">Dance Ministries</h1>
-          <p className="page-header-subtitle">
-            Manage your registered ministries, churches, and affiliated organizations.
-          </p>
-        </div>
-        <button className="btn btn-primary" onClick={onAddMinistry}>
-          <Plus size={18} />
-          Register Ministry
-        </button>
-      </div>
-
-      {/* Summary Statistics */}
-      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', marginBottom: '2rem' }}>
-        <div className="stat-card">
-          <div className="stat-card-header">
-            <span className="stat-card-title">Total Ministries</span>
-            <div className="stat-card-icon" style={{ background: '#f3f4f6', color: '#6b7280' }}><Building2 size={18} /></div>
-          </div>
-          <div className="stat-card-value">{ministries.length}</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-card-header">
-            <span className="stat-card-title">Active Ministries</span>
-            <div className="stat-card-icon" style={{ background: '#dcfce7', color: '#16a34a' }}><Building2 size={18} /></div>
-          </div>
-          <div className="stat-card-value">{activeMinistries}</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-card-header">
-            <span className="stat-card-title">Regions Covered</span>
-            <div className="stat-card-icon" style={{ background: '#e0f2fe', color: '#0284c7' }}><MapPin size={18} /></div>
-          </div>
-          <div className="stat-card-value">{regionsCovered}</div>
-        </div>
-      </div>
-
-      {/* Unified Toolbar */}
-      <div className="toolbar" style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-        <div className="filters-group" style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', flex: 1 }}>
-          <div className="search-bar-container" style={{ display: 'block' }}>
-            <Search size={18} className="search-icon" />
-            <input 
-              type="text" 
-              className="search-input" 
-              placeholder="Search ministries..." 
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <select 
-            className="form-control" 
-            style={{ width: '180px' }}
-            value={regionFilter} 
-            onChange={e => setRegionFilter(e.target.value)}
-          >
-            <option value="">All Regions</option>
-            {GHANA_REGIONS.map(r => (
-              <option key={r} value={r}>{r}</option>
-            ))}
-          </select>
-          <select 
-            className="form-control"
-            style={{ width: '160px' }} 
-            value={statusFilter} 
-            onChange={e => setStatusFilter(e.target.value)}
-          >
-            <option value="">All Statuses</option>
+    <div className="page-content">
+      <div className="toolbar" style={{ borderRadius: 'var(--radius-lg)' }}>
+        <div className="toolbar-group">
+          <select className="form-control" style={{ width: '150px' }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+            <option value="">All Status</option>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
           </select>
-          {(searchTerm || regionFilter || statusFilter !== 'active') && (
-            <button className="btn btn-secondary btn-sm" onClick={resetFilters}>Reset</button>
-          )}
         </div>
         
-        <div className="view-toggle" style={{ display: 'flex', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '4px' }}>
-          <button 
-            className="btn-icon" 
-            style={{ background: viewMode === 'grid' ? '#f3f4f6' : 'transparent', color: viewMode === 'grid' ? 'var(--text-main)' : 'var(--text-muted)' }} 
-            onClick={() => setViewMode('grid')}
-          >
-            <LayoutGrid size={18} />
-          </button>
-          <button 
-            className="btn-icon" 
-            style={{ background: viewMode === 'table' ? '#f3f4f6' : 'transparent', color: viewMode === 'table' ? 'var(--text-main)' : 'var(--text-muted)' }} 
-            onClick={() => setViewMode('table')}
-          >
-            <List size={18} />
+        <div className="toolbar-actions">
+          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>{filteredMinistries.length} Ministries</span>
+          <div style={{ display: 'flex', background: 'var(--bg-app)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+            <button className="btn-icon" style={{ borderRadius: 0, background: viewMode === 'table' ? 'white' : 'transparent', color: viewMode === 'table' ? 'var(--primary)' : 'var(--text-muted)' }} onClick={() => setViewMode('table')}><List size={18} /></button>
+            <button className="btn-icon" style={{ borderRadius: 0, background: viewMode === 'grid' ? 'white' : 'transparent', color: viewMode === 'grid' ? 'var(--primary)' : 'var(--text-muted)' }} onClick={() => setViewMode('grid')}><LayoutGrid size={18} /></button>
+          </div>
+          <button className="btn btn-primary btn-sm" onClick={onAddMinistry}>
+            <Plus size={16} /> <span className="hide-mobile">Add Ministry</span>
           </button>
         </div>
       </div>
 
-      {viewMode === 'grid' ? (
-        <div className="grid-view" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem' }}>
-          {filteredMinistries.length === 0 ? (
-            <div className="empty-state w-100" style={{ gridColumn: '1 / -1' }}>No ministries found matching your filters.</div>
-          ) : (
-            filteredMinistries.map(ministry => {
-              const leaders = getMinistryLeaders(ministry.id, memberships, dancers);
-              const memberCount = getMinistryMemberCount(ministry.id, memberships);
-              const isInactive = ministry.status !== 'active';
-              
-              return (
-                <div key={ministry.id} className="card" style={{ opacity: isInactive ? 0.75 : 1 }}>
-                  <div className="d-flex gap-3 mb-3">
-                    <div className="list-avatar" style={{ width: 48, height: 48, flexShrink: 0, fontSize: '1.2rem', background: ministry.logo ? 'transparent' : 'var(--primary-light)' }}>
-                      {ministry.logo ? (
-                        <img src={ministry.logo} alt={ministry.name} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
-                      ) : (
-                        ministry.name.charAt(0)
-                      )}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {ministry.name}
-                      </h3>
-                      {ministry.church && <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ministry.church}</p>}
-                    </div>
-                  </div>
-                  
-                  <div className="clean-list" style={{ gap: '0.5rem', marginBottom: '1.5rem' }}>
-                    <div className="d-flex align-items-center gap-2" style={{ fontSize: '0.85rem', color: 'var(--text-body)' }}>
-                      <MapPin size={16} className="text-light" />
-                      <span>{ministry.town ? `${ministry.town}, ` : ''}{ministry.region}</span>
-                    </div>
-                    {leaders.length > 0 && (
-                      <div className="d-flex align-items-center gap-2" style={{ fontSize: '0.85rem', color: 'var(--text-body)' }}>
-                        <Crown size={16} className="text-light" />
-                        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{leaders.map(l => l.name).join(', ')}</span>
-                      </div>
-                    )}
-                    <div className="d-flex align-items-center gap-2" style={{ fontSize: '0.85rem', color: 'var(--text-body)' }}>
-                      <Users size={16} className="text-light" />
-                      <span>{memberCount} Dancer{memberCount !== 1 ? 's' : ''}</span>
-                    </div>
-                  </div>
-                  
-                  <div className="d-flex align-items-center justify-content-between mt-auto" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
-                    <div className="permission-dot" style={{ fontWeight: 600, color: isInactive ? 'var(--text-muted)' : 'var(--success-text)' }}>
-                      <div className={`dot-indicator ${isInactive ? 'bg-gray-400' : 'dot-success'}`} style={{ background: isInactive ? '#9ca3af' : undefined }} />
-                      {isInactive ? 'Inactive' : 'Active'}
-                    </div>
-                    <div className="d-flex gap-1">
-                      <button className="btn-icon" onClick={() => onViewMinistry(ministry)} title="View Details"><Eye size={18} /></button>
-                      <button className="btn-icon" onClick={() => onEditMinistry(ministry)} title="Edit"><Edit3 size={18} /></button>
-                      <button className="btn-icon" onClick={() => handleDeactivate(ministry)} title={isInactive ? 'Activate' : 'Deactivate'} style={{ color: isInactive ? 'var(--success-text)' : 'var(--danger-text)' }}>
-                        <Power size={18} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      ) : (
-        <div className="table-container">
-          <table className="custom-table">
-            <thead>
-              <tr>
-                <th>Ministry</th>
-                <th>Location</th>
-                <th>Leader(s)</th>
-                <th>Members</th>
-                <th>Status</th>
-                <th style={{ textAlign: 'right' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredMinistries.length === 0 ? (
+      <div className="card">
+        {filteredMinistries.length === 0 ? (
+          <div className="empty-state">No ministries match your criteria.</div>
+        ) : viewMode === 'table' ? (
+          <div className="table-wrapper">
+            <table className="data-table">
+              <thead>
                 <tr>
-                  <td colSpan="6">
-                    <div className="empty-state">No ministries found.</div>
-                  </td>
+                  <th>Ministry</th>
+                  <th>Leader</th>
+                  <th>Location</th>
+                  <th>Dancers</th>
+                  <th>Status</th>
+                  <th className="text-right">Actions</th>
                 </tr>
-              ) : (
-                filteredMinistries.map(ministry => {
+              </thead>
+              <tbody>
+                {filteredMinistries.map(ministry => {
+                  const isActive = ministry.status === 'active';
                   const leaders = getMinistryLeaders(ministry.id, memberships, dancers);
-                  const memberCount = getMinistryMemberCount(ministry.id, memberships);
-                  const isInactive = ministry.status !== 'active';
-                  
+                  const leaderNames = leaders.map(l => l.name).join(', ') || 'No leader';
+                  const memberCount = memberships.filter(m => m.ministryId === ministry.id).length;
+                  const menuOpen = activeMenuId === ministry.id;
+
                   return (
-                    <tr key={ministry.id} style={{ opacity: isInactive ? 0.75 : 1 }}>
+                    <tr key={ministry.id} style={{ opacity: isActive ? 1 : 0.6 }}>
                       <td>
-                        <div className="d-flex align-items-center gap-3">
-                          <div className="list-avatar" style={{ width: 36, height: 36, fontSize: '0.9rem', background: ministry.logo ? 'transparent' : 'var(--primary-light)' }}>
-                            {ministry.logo ? (
-                              <img src={ministry.logo} alt={ministry.name} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
-                            ) : (
-                              ministry.name.charAt(0)
-                            )}
+                        <div className="cell-identity">
+                          <div className="avatar" style={{ borderRadius: 'var(--radius-sm)' }}>
+                            {ministry.logo ? <img src={ministry.logo} alt={ministry.name} /> : ministry.name.charAt(0)}
                           </div>
-                          <div>
-                            <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{ministry.name}</div>
-                            {ministry.church && <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{ministry.church}</div>}
-                          </div>
+                          <span className="identity-primary" style={{ whiteSpace: 'normal', maxWidth: '200px' }}>{ministry.name}</span>
                         </div>
                       </td>
-                      <td>{ministry.town ? `${ministry.town}, ` : ''}{ministry.region}</td>
-                      <td>{leaders.length > 0 ? leaders.map(l => l.name).join(', ') : '-'}</td>
-                      <td>{memberCount}</td>
+                      <td><span className="td-main">{leaderNames}</span></td>
                       <td>
-                        <div className="permission-dot" style={{ color: isInactive ? 'var(--text-muted)' : 'var(--success-text)' }}>
-                          <div className={`dot-indicator ${isInactive ? '' : 'dot-success'}`} style={{ background: isInactive ? '#9ca3af' : undefined }} />
-                          {isInactive ? 'Inactive' : 'Active'}
+                        <div className="cell-stack">
+                          <span className="stack-primary">{ministry.town || 'Not specified'}</span>
+                          {ministry.region && <span className="stack-secondary"><MapPin size={12}/> {ministry.region}</span>}
                         </div>
                       </td>
                       <td>
-                        <div className="d-flex gap-1 justify-content-end">
-                          <button className="btn-icon" onClick={() => onViewMinistry(ministry)} title="View Details"><Eye size={18} /></button>
-                          <button className="btn-icon" onClick={() => onEditMinistry(ministry)} title="Edit"><Edit3 size={18} /></button>
-                          <button className="btn-icon" onClick={() => handleDeactivate(ministry)} title={isInactive ? 'Activate' : 'Deactivate'} style={{ color: isInactive ? 'var(--success-text)' : 'var(--danger-text)' }}>
-                            <Power size={18} />
+                        <span className="badge badge-blue"><Users size={12} style={{ marginRight: 4 }}/> {memberCount}</span>
+                      </td>
+                      <td>
+                        <div className="status-indicator">
+                          <span className={`status-dot ${isActive ? 'active' : 'inactive'}`}></span>
+                          {isActive ? 'Active' : 'Inactive'}
+                        </div>
+                      </td>
+                      <td className="text-right">
+                        <div className="action-menu-wrapper">
+                          <button className="btn-icon" onClick={() => setActiveMenuId(menuOpen ? null : ministry.id)}>
+                            <MoreVertical size={18} />
                           </button>
+                          {menuOpen && (
+                            <>
+                              <div className="action-overlay" onClick={() => setActiveMenuId(null)}></div>
+                              <div className="action-dropdown">
+                                <button onClick={() => { onViewMinistry(ministry); setActiveMenuId(null); }}><Eye size={16} /> View Ministry</button>
+                                <button onClick={() => { onEditMinistry(ministry); setActiveMenuId(null); }}><Edit3 size={16} /> Edit Ministry</button>
+                                {canDeleteMinistry(ministry.id, memberships) && <button className="danger" onClick={() => handleDelete(ministry)}><Trash2 size={16} /> Delete</button>}
+                              </div>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
                   );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="data-grid">
+            {filteredMinistries.map(ministry => {
+              const isActive = ministry.status === 'active';
+              const leaders = getMinistryLeaders(ministry.id, memberships, dancers);
+              const leaderNames = leaders.map(l => l.name).join(', ') || 'No leader';
+              const memberCount = memberships.filter(m => m.ministryId === ministry.id).length;
+              const menuOpen = activeMenuId === ministry.id;
+
+              return (
+                <div key={ministry.id} className="data-grid-card" style={{ opacity: isActive ? 1 : 0.6 }}>
+                  <div className="d-flex justify-between align-center">
+                    <div className="cell-identity">
+                      <div className="avatar" style={{ borderRadius: 'var(--radius-sm)' }}>
+                        {ministry.logo ? <img src={ministry.logo} alt={ministry.name} /> : ministry.name.charAt(0)}
+                      </div>
+                      <span className="identity-primary">{ministry.name}</span>
+                    </div>
+                    <div className="action-menu-wrapper">
+                      <button className="btn-icon" onClick={() => setActiveMenuId(menuOpen ? null : ministry.id)}><MoreVertical size={18} /></button>
+                      {menuOpen && (
+                        <>
+                          <div className="action-overlay" onClick={() => setActiveMenuId(null)}></div>
+                          <div className="action-dropdown">
+                            <button onClick={() => { onViewMinistry(ministry); setActiveMenuId(null); }}><Eye size={16} /> View Ministry</button>
+                            <button onClick={() => { onEditMinistry(ministry); setActiveMenuId(null); }}><Edit3 size={16} /> Edit Ministry</button>
+                            {canDeleteMinistry(ministry.id, memberships) && <button className="danger" onClick={() => handleDelete(ministry)}><Trash2 size={16} /> Delete</button>}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <div className="d-flex flex-column gap-2 mt-4">
+                    <div className="d-flex justify-between">
+                      <span className="td-quiet">Leader</span>
+                      <span className="td-main" style={{ fontSize: '0.85rem' }}>{leaderNames}</span>
+                    </div>
+                    <div className="d-flex justify-between">
+                      <span className="td-quiet">Members</span>
+                      <span className="badge badge-blue">{memberCount}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

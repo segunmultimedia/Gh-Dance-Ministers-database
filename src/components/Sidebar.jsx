@@ -36,85 +36,70 @@ export default function Sidebar({
   return (
     <>
       {isMobileOpen && (
-        <div className="modal-overlay" onClick={() => setIsMobileOpen(false)} style={{ zIndex: 40 }} />
+        <div className="modal-overlay" onClick={() => setIsMobileOpen(false)} style={{ zIndex: 35 }} />
       )}
-      <aside className={`sidebar ${isMobileOpen ? 'sidebar-mobile-open' : ''}`}>
-        <div className="brand">
-          <LogoComponent className="brand-logo" />
-          <div className="brand-text-container">
-            <h1 className="brand-name" style={{ color: 'var(--text-main)' }}>GH Dance Ministers</h1>
-            <p className="brand-tag">Database</p>
+      <aside className={`sidebar ${isMobileOpen ? 'mobile-open' : ''}`}>
+        <div className="sidebar-header">
+          <LogoComponent />
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-main)', lineHeight: 1.2 }}>GH Dance</span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Database</span>
           </div>
           {isMobileOpen && (
-            <button className="btn-icon mobile-close-btn" onClick={() => setIsMobileOpen(false)}>
-              <X size={24} />
+            <button className="btn-icon" onClick={() => setIsMobileOpen(false)} style={{ marginLeft: 'auto' }}>
+              <X size={20} />
             </button>
           )}
         </div>
 
-        <div className="sidebar-scroll-area">
-          <nav className="sidebar-nav">
-            <div className="nav-section">
-              <h2 className="nav-section-title">General</h2>
-              {generalItems.map(item => {
-                const Icon = item.icon;
-                const isActive = activeTab === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    className={`nav-item ${isActive ? 'active' : ''}`}
-                    onClick={() => handleTabClick(item.id)}
-                  >
-                    <Icon size={20} className="nav-icon" />
-                    <span className="nav-label">{item.label}</span>
-                    {item.badge !== undefined && item.badge > 0 && (
-                      <span className={`badge ${isActive ? 'badge-active' : ''} ${item.isAlert && !isActive ? 'badge-danger' : 'badge-subtle'}`}>
-                        {item.badge}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+        <nav className="sidebar-nav">
+          <div className="nav-section">General</div>
+          {generalItems.map(item => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id;
+            return (
+              <button key={item.id} className={`sidebar-link ${isActive ? 'active' : ''}`} onClick={() => handleTabClick(item.id)} style={{ background: 'transparent', border: 'none', width: '100%' }}>
+                <div className="sidebar-link-content">
+                  <Icon size={18} />
+                  <span>{item.label}</span>
+                </div>
+                {item.badge !== undefined && item.badge > 0 && (
+                  <span className={`badge ${item.isAlert ? 'badge-orange' : ''}`} style={{ border: 'none', background: isActive ? 'white' : 'var(--bg-app)' }}>{item.badge}</span>
+                )}
+              </button>
+            );
+          })}
 
-            <div className="nav-section mt-3">
-              <h2 className="nav-section-title">Management</h2>
-              {managementItems.map(item => {
-                const Icon = item.icon;
-                const isActive = activeTab === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    className={`nav-item ${isActive ? 'active' : ''}`}
-                    onClick={() => handleTabClick(item.id)}
-                  >
-                    <Icon size={20} className="nav-icon" />
-                    <span className="nav-label">{item.label}</span>
-                    {item.badge !== undefined && item.badge > 0 && (
-                      <span className={`badge ${isActive ? 'badge-active' : 'badge-subtle'}`}>
-                        {item.badge}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </nav>
-        </div>
+          <div className="nav-section">Management</div>
+          {managementItems.map(item => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id;
+            return (
+              <button key={item.id} className={`sidebar-link ${isActive ? 'active' : ''}`} onClick={() => handleTabClick(item.id)} style={{ background: 'transparent', border: 'none', width: '100%' }}>
+                <div className="sidebar-link-content">
+                  <Icon size={18} />
+                  <span>{item.label}</span>
+                </div>
+                {item.badge !== undefined && item.badge > 0 && (
+                  <span className="badge" style={{ border: 'none', background: isActive ? 'white' : 'var(--bg-app)' }}>{item.badge}</span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
 
-        <div className="sidebar-footer">
-          <div className="user-profile-compact">
-            <div className="user-profile-avatar">
-              <ShieldCheck size={18} />
+        <div style={{ padding: '1rem', borderTop: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+            <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--primary-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ShieldCheck size={16} />
             </div>
-            <div className="user-info">
-              <p className="user-name">{adminUser.name || 'GH Dance Admin'}</p>
-              <p className="user-role">{adminUser.role || 'System Admin'}</p>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>{adminUser.name || 'GH Dance Admin'}</span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{adminUser.role || 'System Admin'}</span>
             </div>
           </div>
-          <button className="btn-logout" onClick={onLogout}>
-            <LogOut size={16} />
-            <span>Log Out</span>
+          <button className="btn btn-ghost" onClick={onLogout} style={{ width: '100%', justifyContent: 'center' }}>
+            <LogOut size={16} /> Log Out
           </button>
         </div>
       </aside>

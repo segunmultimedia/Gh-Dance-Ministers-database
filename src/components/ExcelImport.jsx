@@ -317,8 +317,8 @@ export default function ExcelImport({ onImportComplete, ministries, dancers }) {
           {importHistory.length === 0 ? (
             <p className="text-muted">No import history found.</p>
           ) : (
-            <div className="table-container">
-              <table className="custom-table" style={{ width: '100%' }}>
+            <div className="table-wrapper">
+              <table className="data-table" style={{ width: '100%' }}>
                 <thead>
                   <tr>
                     <th>File Name</th>
@@ -380,8 +380,8 @@ export default function ExcelImport({ onImportComplete, ministries, dancers }) {
         </h2>
         <p className="text-muted">Map your file columns to the correct database fields.</p>
 
-        <div className="table-container" style={{ margin: '2rem 0' }}>
-          <table className="custom-table" style={{ width: '100%', tableLayout: 'fixed' }}>
+        <div className="table-wrapper" style={{ margin: '2rem 0' }}>
+          <table className="data-table" style={{ width: '100%', tableLayout: 'fixed' }}>
             <thead>
               <tr>
                 {headers.map(header => (
@@ -482,8 +482,8 @@ export default function ExcelImport({ onImportComplete, ministries, dancers }) {
           ))}
         </div>
 
-        <div className="table-container" style={{ maxHeight: '400px', overflowY: 'auto', marginBottom: '2rem' }}>
-          <table className="custom-table" style={{ width: '100%' }}>
+        <div className="table-wrapper" style={{ maxHeight: '400px', overflowY: 'auto', marginBottom: '2rem' }}>
+          <table className="data-table" style={{ width: '100%' }}>
             <thead style={{ position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
               <tr>
                 <th>Include</th>

@@ -1,271 +1,206 @@
-import React from 'react';
-import { Download, Users, Building2, Crown, Calendar, MapPin, Activity } from 'lucide-react';
-import { GHANA_REGIONS, DANCER_TYPES, getDancerTypeLabel } from '../utils/constants';
-import { getMinistryLeaders, getMinistryMemberCount, getDancerPrimaryMinistry, getAllLeadersResolved } from '../services/dataService';
-import { getBirthdayInfo } from '../utils/birthdayUtils';
+import React, { useMemo } from 'react';
+import { Download, Users, Building2, Crown, Calendar, PieChart, MapPin } from 'lucide-react';
+import { GHANA_REGIONS, DANCER_TYPES, MONTH_NAMES_SHORT } from '../utils/constants';
 
 export default function Reports({ dancers, ministries, memberships }) {
-  // Stats calculations
-  const activeDancers = dancers.filter(d => d.status === 'Active');
-  const activeMinistries = ministries.filter(m => m.status === 'active');
-  const allLeaders = getAllLeadersResolved(dancers, memberships, ministries);
-  
-  const upcomingBirthdays = dancers.filter(d => {
-    const bInfo = getBirthdayInfo(d.birthdayDay, d.birthdayMonth, d.birthYear);
-    return bInfo && bInfo.daysUntil <= 30;
-  });
+  const activeDancers = useMemo(() => dancers.filter(d => d.status === 'Active'), [dancers]);
+  const activeMinistries = useMemo(() => ministries.filter(m => m.status === 'active'), [ministries]);
+  const activeLeadersCount = useMemo(() => {
+    return new Set(memberships.filter(m => m.roles.includes('ministry_leader') || m.roles.includes('assistant_leader')).map(m => m.dancerId)).size;
+  }, [memberships]);
 
-  const exportCSV = () => {
-    // Generate CSV data
-    const rows = [
-      ['Report Type', 'Metric', 'Value'],
-      ['Overview', 'Total Active Dancers', activeDancers.length],
-      ['Overview', 'Total Ministries', ministries.length],
-      ['Overview', 'Active Ministries', activeMinistries.length],
-      ['Overview', 'Total Leaders', allLeaders.length]
-    ];
-    
-    // Add Ministry Stats
-    rows.push([]);
-    rows.push(['MINISTRY STATS']);
-    rows.push(['Ministry Name', 'Status', 'Members', 'Leaders']);
-    ministries.forEach(m => {
-      const memberCount = getMinistryMemberCount(m.id, memberships);
-      const leaderCount = getMinistryLeaders(m.id, memberships, dancers).length;
-      rows.push([m.name, m.status, memberCount, leaderCount]);
-    });
+  const ministryStats = useMemo(() => {
+    return activeMinistries.map(min => {
+      const activeMembers = memberships.filter(m => m.ministryId === min.id);
+      const dancersInMin = activeMembers.map(m => dancers.find(d => d.id === m.dancerId)).filter(d => d && d.status === 'Active');
+      return { id: min.id, name: min.name, count: dancersInMin.length };
+    }).sort((a, b) => b.count - a.count);
+  }, [activeMinistries, memberships, dancers]);
 
-    const csvContent = "data:text/csv;charset=utf-8," + rows.map(e => e.join(",")).join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `gh-dance-database-report-${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+  const regionStats = useMemo(() => {
+    return GHANA_REGIONS.map(region => ({
+      region,
+      dancers: activeDancers.filter(d => d.region === region).length,
+      ministries: activeMinistries.filter(m => m.region === region).length,
+    })).filter(s => s.dancers > 0 || s.ministries > 0).sort((a, b) => b.dancers - a.dancers);
+  }, [activeDancers, activeMinistries]);
 
-  // Prepare table data
-  const ministryStats = ministries.map(m => {
-    return {
-      id: m.id,
-      name: m.name,
-      status: m.status === 'active' ? 'Active' : 'Inactive',
-      region: m.region,
-      memberCount: getMinistryMemberCount(m.id, memberships),
-      leaderCount: getMinistryLeaders(m.id, memberships, dancers).length
-    };
-  }).sort((a, b) => b.memberCount - a.memberCount);
+  const typeStats = useMemo(() => {
+    return DANCER_TYPES.map(type => ({
+      label: type.label,
+      count: activeDancers.filter(d => d.dancerType === type.value).length
+    }));
+  }, [activeDancers]);
 
-  const regionStats = GHANA_REGIONS.map(region => {
-    const regionDancers = dancers.filter(d => d.region === region).length;
-    const regionMinistries = ministries.filter(m => m.region === region).length;
-    const regionLeaders = allLeaders.filter(l => l.dancer.region === region).length;
-    return { region, dancers: regionDancers, ministries: regionMinistries, leaders: regionLeaders };
-  }).filter(r => r.dancers > 0 || r.ministries > 0).sort((a, b) => b.dancers - a.dancers);
+  const birthdayStats = useMemo(() => {
+    return MONTH_NAMES_SHORT.map((monthStr, index) => ({
+      month: monthStr,
+      total: activeDancers.filter(d => d.birthdayMonth === index + 1).length
+    }));
+  }, [activeDancers]);
 
-  const dancerTypeStats = DANCER_TYPES.map(type => {
-    const count = activeDancers.filter(d => d.dancerType === type.id).length;
-    const percent = activeDancers.length > 0 ? Math.round((count / activeDancers.length) * 100) : 0;
-    return { label: type.label, count, percent };
-  }).sort((a, b) => b.count - a.count);
-
-  const birthdayStats = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((month, index) => {
-    const monthDancers = activeDancers.filter(d => {
-      if (!d.birthdayMonth) return false;
-      const mStr = String(d.birthdayMonth);
-      return mStr === month || mStr === String(index + 1) || mStr === String(index + 1).padStart(2, '0');
-    });
-    const published = monthDancers.filter(d => d.allowBirthdayPublication).length;
-    const privateCount = monthDancers.length - published;
-    return { month, total: monthDancers.length, published, private: privateCount };
-  });
+  const maxBirthdays = Math.max(...birthdayStats.map(s => s.total), 1);
 
   return (
-    <div className="d-flex flex-column gap-4">
-      
-      {/* Visual Anchor / Hero Card */}
-      <div className="hero-anchor">
-        <div className="hero-anchor-content">
-          <h1 className="hero-title">Reports & Analytics</h1>
-          <p className="hero-subtitle">
-            View high-level insights, regional distributions, and database health metrics.
-          </p>
+    <div className="page-content">
+      <div className="toolbar" style={{ borderRadius: 'var(--radius-lg)' }}>
+        <div className="toolbar-group">
+          <span style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)' }}>Reports & Analytics</span>
         </div>
-        <div className="hero-actions">
-          <button className="btn btn-white" onClick={exportCSV}>
-            <Download size={18} />
-            Export Full Report (CSV)
+        <div className="toolbar-actions">
+          <button className="btn btn-secondary btn-sm" onClick={() => window.print()}>
+            <Download size={16} /> Export / Print
           </button>
         </div>
       </div>
 
-      {/* Premium Stat Cards Grid */}
-      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+      <div className="stats-grid">
         <div className="stat-card">
           <div className="stat-card-header">
-            <span className="stat-card-title">Total Active Dancers</span>
-            <div className="stat-card-icon"><Users size={18} /></div>
+            <span className="stat-card-title">Active Dancers</span>
+            <div className="avatar" style={{ background: 'var(--primary-light)', color: 'var(--primary)' }}><Users size={18} /></div>
           </div>
           <div className="stat-card-value">{activeDancers.length}</div>
         </div>
-        
         <div className="stat-card">
           <div className="stat-card-header">
-            <span className="stat-card-title">Total Active Ministries</span>
-            <div className="stat-card-icon" style={{ background: '#dcfce7', color: '#16a34a' }}><Building2 size={18} /></div>
+            <span className="stat-card-title">Active Ministries</span>
+            <div className="avatar" style={{ background: 'var(--success-bg)', color: 'var(--success)' }}><Building2 size={18} /></div>
           </div>
           <div className="stat-card-value">{activeMinistries.length}</div>
         </div>
-        
         <div className="stat-card">
           <div className="stat-card-header">
-            <span className="stat-card-title">Total Leaders</span>
-            <div className="stat-card-icon" style={{ background: '#fef3c7', color: '#d97706' }}><Crown size={18} /></div>
+            <span className="stat-card-title">Active Leaders</span>
+            <div className="avatar" style={{ background: 'var(--warning-bg)', color: 'var(--warning)' }}><Crown size={18} /></div>
           </div>
-          <div className="stat-card-value">{allLeaders.length}</div>
-        </div>
-        
-        <div className="stat-card">
-          <div className="stat-card-header">
-            <span className="stat-card-title">Birthdays (30 days)</span>
-            <div className="stat-card-icon" style={{ background: '#ffe4e6', color: '#e11d48' }}><Calendar size={18} /></div>
-          </div>
-          <div className="stat-card-value">{upcomingBirthdays.length}</div>
+          <div className="stat-card-value">{activeLeadersCount}</div>
         </div>
       </div>
 
-      <div className="dashboard-grid" style={{ gap: '2rem' }}>
-        
-        <div className="d-flex flex-column gap-4" style={{ flex: 2 }}>
-          {/* Ministry Membership Report */}
-          <div className="card">
-            <div className="card-header">
-              <h3 className="card-title"><Building2 size={20} style={{ color: '#9ca3af' }} /> Ministry Membership Report</h3>
-            </div>
-            <div className="table-container" style={{ maxHeight: '350px', overflowY: 'auto', border: 'none', borderTop: '1px solid var(--border-color)', borderRadius: 0 }}>
-              <table className="custom-table" style={{ width: '100%' }}>
-                <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
-                  <tr>
-                    <th>Ministry Name</th>
-                    <th>Region</th>
-                    <th>Members</th>
-                    <th>Leaders</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {ministryStats.length === 0 ? (
-                    <tr>
-                      <td colSpan="5" className="empty-state">No ministry data available.</td>
-                    </tr>
-                  ) : (
-                    ministryStats.map(m => (
-                      <tr key={m.id}>
-                        <td style={{ fontWeight: 600, color: 'var(--text-main)' }}>{m.name}</td>
-                        <td style={{ color: 'var(--text-body)' }}>{m.region || '-'}</td>
-                        <td style={{ fontWeight: 600 }}>{m.memberCount}</td>
-                        <td>{m.leaderCount}</td>
-                        <td>
-                          <div className="permission-dot" style={{ color: m.status === 'Active' ? 'var(--success-text)' : 'var(--text-muted)' }}>
-                            <div className={`dot-indicator ${m.status === 'Active' ? 'dot-success' : ''}`} style={{ background: m.status === 'Active' ? undefined : '#9ca3af' }} />
-                            {m.status}
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Regional Distribution */}
-          <div className="card">
-            <div className="card-header">
-              <h3 className="card-title"><MapPin size={20} style={{ color: '#9ca3af' }} /> Regional Distribution</h3>
-            </div>
-            <div className="table-container" style={{ border: 'none', borderTop: '1px solid var(--border-color)', borderRadius: 0 }}>
-              <table className="custom-table" style={{ width: '100%' }}>
-                <thead>
-                  <tr>
-                    <th>Region</th>
-                    <th>Dancers</th>
-                    <th>Ministries</th>
-                    <th>Leaders</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {regionStats.length === 0 ? (
-                    <tr>
-                      <td colSpan="4" className="empty-state">No regional data available.</td>
-                    </tr>
-                  ) : (
-                    regionStats.map((r, i) => (
-                      <tr key={i}>
-                        <td style={{ fontWeight: 600, color: 'var(--text-main)' }}>{r.region}</td>
-                        <td>{r.dancers}</td>
-                        <td>{r.ministries}</td>
-                        <td>{r.leaders}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+      <div className="card">
+        <div className="card-header">
+          <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Building2 size={18} className="text-muted" /> Ministry Memberships
+          </h2>
         </div>
-
-        <div className="d-flex flex-column gap-4" style={{ flex: 1 }}>
-          {/* Dancer Type Distribution */}
-          <div className="card">
-            <div className="card-header">
-              <h3 className="card-title"><Users size={20} style={{ color: '#9ca3af' }} /> Type Distribution</h3>
-            </div>
-            <div className="dist-list">
-              {dancerTypeStats.map((t, i) => (
-                <div key={i} className="dist-row">
-                  <div className="dist-header">
-                    <span className="dist-label">{t.label}</span>
-                    <span className="dist-value">{t.count} ({t.percent}%)</span>
-                  </div>
-                  <div className="dist-track">
-                    <div className="dist-bar" style={{ width: `${t.percent}%` }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Birthday Report */}
-          <div className="card">
-            <div className="card-header">
-              <h3 className="card-title"><Calendar size={20} style={{ color: '#9ca3af' }} /> Monthly Birthdays</h3>
-            </div>
-            <div className="table-container" style={{ maxHeight: '350px', overflowY: 'auto', border: 'none', borderTop: '1px solid var(--border-color)', borderRadius: 0 }}>
-              <table className="custom-table" style={{ width: '100%' }}>
-                <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
-                  <tr>
-                    <th>Month</th>
-                    <th>Total</th>
-                    <th>Public</th>
+        <div className="table-wrapper">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Ministry Name</th>
+                <th>Status</th>
+                <th className="text-right">Active Members</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ministryStats.length === 0 ? (
+                <tr><td colSpan="3" className="empty-state">No ministries found.</td></tr>
+              ) : (
+                ministryStats.map(m => (
+                  <tr key={m.id}>
+                    <td className="td-main">{m.name}</td>
+                    <td>
+                      <div className="status-indicator">
+                        <span className="status-dot active"></span> Active
+                      </div>
+                    </td>
+                    <td className="text-right">
+                      <span className="td-main">{m.count}</span> <span className="td-quiet">{m.count === 1 ? 'member' : 'members'}</span>
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {birthdayStats.map((b, i) => (
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '1.5rem' }}>
+        
+        <div className="card">
+          <div className="card-header">
+            <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <MapPin size={18} className="text-muted" /> Regional Distribution
+            </h2>
+          </div>
+          <div className="table-wrapper">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Region</th>
+                  <th className="text-right">Dancers</th>
+                  <th className="text-right">Ministries</th>
+                </tr>
+              </thead>
+              <tbody>
+                {regionStats.length === 0 ? (
+                  <tr><td colSpan="3" className="empty-state">No data available.</td></tr>
+                ) : (
+                  regionStats.map((r, i) => (
                     <tr key={i}>
-                      <td style={{ fontWeight: 600, color: 'var(--text-main)' }}>{b.month}</td>
-                      <td style={{ fontWeight: 600 }}>{b.total}</td>
-                      <td style={{ color: 'var(--success-text)' }}>{b.published}</td>
+                      <td className="td-main">{r.region}</td>
+                      <td className="text-right td-quiet">{r.dancers}</td>
+                      <td className="text-right td-quiet">{r.ministries}</td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
 
+        <div className="card">
+          <div className="card-header">
+            <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <PieChart size={18} className="text-muted" /> Dancer Types
+            </h2>
+          </div>
+          <div className="card-body">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              {typeStats.map((stat, i) => {
+                const percent = activeDancers.length > 0 ? Math.round((stat.count / activeDancers.length) * 100) : 0;
+                return (
+                  <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                      <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{stat.label}</span>
+                      <span style={{ fontWeight: 500, color: 'var(--text-muted)' }}>{stat.count} ({percent}%)</span>
+                    </div>
+                    <div style={{ height: 6, background: 'var(--bg-app)', borderRadius: 3, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', borderRadius: 3, background: 'var(--primary)', width: `${percent}%` }}></div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
       </div>
+
+      <div className="card">
+        <div className="card-header">
+          <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Calendar size={18} className="text-muted" /> Monthly Birthdays
+          </h2>
+        </div>
+        <div className="card-body">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(60px, 1fr))', gap: '0.5rem', alignItems: 'flex-end', height: '180px' }}>
+            {birthdayStats.map((stat, i) => {
+              const heightPercent = maxBirthdays > 0 ? (stat.total / maxBirthdays) * 100 : 0;
+              return (
+                <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-main)' }}>{stat.total > 0 ? stat.total : ''}</span>
+                  <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'flex-end', background: 'transparent' }}>
+                    <div style={{ width: '100%', height: `${heightPercent}%`, background: stat.total > 0 ? 'var(--primary)' : '#e2e8f0', borderRadius: '4px 4px 0 0', minHeight: stat.total > 0 ? '4px' : '0px', transition: 'height 0.3s ease' }}></div>
+                  </div>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>{stat.month}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
     </div>
   );
 }

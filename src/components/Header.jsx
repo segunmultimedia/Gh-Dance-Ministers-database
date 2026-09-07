@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, Search, Bell, UserPlus } from 'lucide-react';
+import { Menu, Search, Bell, Plus } from 'lucide-react';
 
 export default function Header({
   activeTab,
@@ -23,46 +23,41 @@ export default function Header({
     }
   };
 
-  const showSearch = ['dancers', 'leaders', 'ministries', 'birthdays'].includes(activeTab);
-
   return (
     <header className="top-header">
       <div className="header-left">
-        <button className="btn-icon mobile-toggle-btn" onClick={toggleMobileMenu}>
+        <button className="mobile-toggle-btn" onClick={toggleMobileMenu}>
           <Menu size={24} />
         </button>
-        <h1 className="page-title">{getPageTitle()}</h1>
+        <h1 style={{ fontSize: '1.25rem', margin: 0 }}>{getPageTitle()}</h1>
       </div>
 
       <div className="header-right">
-        {showSearch && (
-          <div className="search-bar-container">
-            <Search size={18} className="search-icon" />
+        {['dancers', 'leaders', 'ministries', 'birthdays'].includes(activeTab) && (
+          <div className="search-wrapper">
+            <Search size={16} className="lucide" />
             <input
               type="text"
               className="search-input"
-              placeholder="Search..."
+              placeholder="Quick search..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
         )}
 
-        <div className="header-actions">
-          {birthdayNotificationsCount > 0 && (
-            <button className="notification-btn" title={`${birthdayNotificationsCount} birthdays today`}>
-              <Bell size={20} />
-              <span className="notification-dot">{birthdayNotificationsCount > 9 ? '9+' : birthdayNotificationsCount}</span>
-            </button>
-          )}
+        {birthdayNotificationsCount > 0 && (
+          <button className="btn-icon" style={{ position: 'relative' }} title={`${birthdayNotificationsCount} birthdays today`}>
+            <Bell size={20} />
+            <span style={{ position: 'absolute', top: 2, right: 2, width: 8, height: 8, background: 'var(--danger)', borderRadius: '50%', border: '2px solid white' }}></span>
+          </button>
+        )}
 
-          {activeTab === 'dancers' && (
-            <button className="btn btn-primary btn-sm btn-header" onClick={onOpenAddDancer}>
-              <UserPlus size={16} />
-              <span>Register New Dancer</span>
-            </button>
-          )}
-        </div>
+        {activeTab === 'dancers' && (
+          <button className="btn btn-primary btn-sm" onClick={onOpenAddDancer}>
+            <Plus size={16} /> <span className="hide-mobile">Register Dancer</span>
+          </button>
+        )}
       </div>
     </header>
   );

@@ -46,13 +46,13 @@ export default function Settings({ dancers, ministries, memberships, onRefreshDa
   };
 
   return (
-    <div className="d-flex flex-column gap-4">
+    <div className="page-content">
       
       {/* Page Header */}
-      <div className="page-header">
+      <div className="">
         <div>
-          <h1 className="page-header-title">Settings & Data Management</h1>
-          <p className="page-header-subtitle">
+          <h1 className="card-title">Settings & Data Management</h1>
+          <p className="card-desc">
             Manage your local database, backups, and application preferences.
           </p>
         </div>

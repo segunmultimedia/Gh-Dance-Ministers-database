@@ -1,276 +1,194 @@
 import React, { useState, useMemo } from 'react';
-import { Search, MapPin, Phone, Mail, MessageCircle, Crown, LayoutGrid, List, Users, BookOpen } from 'lucide-react';
-import { LEADERSHIP_ROLES, getRoleLabel } from '../utils/constants';
-import { getWhatsAppLink, formatPhoneDisplay } from '../utils/phoneUtils';
+import { LayoutGrid, List, Eye, Phone, MapPin, MoreVertical } from 'lucide-react';
+import { GHANA_REGIONS, getRoleLabel } from '../utils/constants';
+import { formatPhoneDisplay, getWhatsAppLink } from '../utils/phoneUtils';
+import { getAllLeadersResolved } from '../services/dataService';
 
-export default function Leaders({ leadersResolved }) {
-  const [searchTerm, setSearchTerm] = useState('');
+export default function Leaders({ dancers, ministries, memberships, onViewDancer, searchTerm }) {
+  const [regionFilter, setRegionFilter] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
-  const [viewMode, setViewMode] = useState('grid');
+  const [ministryFilter, setMinistryFilter] = useState('');
+  const [viewMode, setViewMode] = useState('table');
+  const [activeMenuId, setActiveMenuId] = useState(null);
+
+  const activeMinistries = ministries.filter(m => m.status !== 'inactive');
+  
+  const allLeaders = useMemo(() => {
+    return getAllLeadersResolved(dancers, memberships, ministries);
+  }, [dancers, memberships, ministries]);
+
+  const allRolesList = Array.from(new Set(allLeaders.map(l => l.role)));
 
   const filteredLeaders = useMemo(() => {
-    return leadersResolved.filter(item => {
-      const { dancer, assignments } = item;
-      
-      const matchSearch = dancer.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          assignments.some(a => a.ministry && a.ministry.name.toLowerCase().includes(searchTerm.toLowerCase()));
-      
-      const matchRole = roleFilter 
-        ? assignments.some(a => a.roles.includes(roleFilter))
-        : true;
-        
-      return matchSearch && matchRole;
+    return allLeaders.filter(leader => {
+      const matchSearch = leader.name.toLowerCase().includes((searchTerm || '').toLowerCase()) || 
+                          (leader.phone && leader.phone.includes(searchTerm || ''));
+      const matchRegion = regionFilter ? leader.region === regionFilter : true;
+      const matchRole = roleFilter ? leader.role === roleFilter : true;
+      const matchMinistry = ministryFilter ? (leader.ministryId && leader.ministryId.toString() === ministryFilter) : true;
+      return matchSearch && matchRegion && matchRole && matchMinistry;
     });
-  }, [leadersResolved, searchTerm, roleFilter]);
+  }, [allLeaders, searchTerm, regionFilter, roleFilter, ministryFilter]);
 
-  // Statistics
-  const totalLeaders = leadersResolved.length;
-  const uniqueMinistriesLed = new Set(
-    leadersResolved.flatMap(item => 
-      item.assignments
-        .filter(a => a.roles.includes('ministry_leader') && a.ministry)
-        .map(a => a.ministry.id)
-    )
-  ).size;
-  const totalChoreographers = leadersResolved.filter(item => 
-    item.assignments.some(a => a.roles.includes('choreographer'))
-  ).length;
-  const totalInstructors = leadersResolved.filter(item => 
-    item.assignments.some(a => a.roles.includes('instructor'))
-  ).length;
+  // Aggregate unique leaders for statistics to avoid duplicate counting
+  const uniqueLeaderIds = new Set(filteredLeaders.map(l => l.id));
 
   return (
-    <div className="d-flex flex-column gap-4">
-      
-      {/* Page Header */}
-      <div className="page-header">
-        <div>
-          <h1 className="page-header-title">Dance Leaders</h1>
-          <p className="page-header-subtitle">
-            Manage ministry leaders, assistant leaders, choreographers, and instructors.
-          </p>
-        </div>
-      </div>
-
-      {/* Summary Statistics */}
-      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', marginBottom: '2rem' }}>
-        <div className="stat-card">
-          <div className="stat-card-header">
-            <span className="stat-card-title">Total Leaders</span>
-            <div className="stat-card-icon" style={{ background: '#fef3c7', color: '#d97706' }}><Crown size={18} /></div>
-          </div>
-          <div className="stat-card-value">{totalLeaders}</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-card-header">
-            <span className="stat-card-title">Ministries Led</span>
-            <div className="stat-card-icon" style={{ background: '#f3f4f6', color: '#6b7280' }}><Users size={18} /></div>
-          </div>
-          <div className="stat-card-value">{uniqueMinistriesLed}</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-card-header">
-            <span className="stat-card-title">Choreographers</span>
-            <div className="stat-card-icon" style={{ background: '#e0f2fe', color: '#0284c7' }}><LayoutGrid size={18} /></div>
-          </div>
-          <div className="stat-card-value">{totalChoreographers}</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-card-header">
-            <span className="stat-card-title">Instructors</span>
-            <div className="stat-card-icon" style={{ background: '#dcfce7', color: '#16a34a' }}><BookOpen size={18} /></div>
-          </div>
-          <div className="stat-card-value">{totalInstructors}</div>
-        </div>
-      </div>
-
-      {/* Unified Toolbar */}
-      <div className="toolbar" style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-        <div className="filters-group" style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', flex: 1 }}>
-          <div className="search-bar-container" style={{ display: 'block' }}>
-            <Search size={18} className="search-icon" />
-            <input 
-              type="text" 
-              className="search-input" 
-              placeholder="Search leaders or ministries..." 
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <select 
-            className="form-control" 
-            style={{ width: '200px' }}
-            value={roleFilter} 
-            onChange={e => setRoleFilter(e.target.value)}
-          >
-            <option value="">All Leadership Roles</option>
-            {LEADERSHIP_ROLES.map(r => (
-              <option key={r} value={r}>{getRoleLabel(r)}</option>
-            ))}
+    <div className="page-content">
+      <div className="toolbar" style={{ borderRadius: 'var(--radius-lg)' }}>
+        <div className="toolbar-group">
+          <select className="form-control" style={{ width: '150px' }} value={roleFilter} onChange={e => setRoleFilter(e.target.value)}>
+            <option value="">All Roles</option>
+            {allRolesList.map(r => <option key={r} value={r}>{getRoleLabel(r)}</option>)}
           </select>
-          {(searchTerm || roleFilter) && (
-            <button className="btn btn-secondary btn-sm" onClick={() => { setSearchTerm(''); setRoleFilter(''); }}>Reset</button>
-          )}
+          <select className="form-control" style={{ width: '160px' }} value={ministryFilter} onChange={e => setMinistryFilter(e.target.value)}>
+            <option value="">All Ministries</option>
+            {activeMinistries.map(m => <option key={m.id} value={m.id.toString()}>{m.name}</option>)}
+          </select>
+          <select className="form-control" style={{ width: '150px' }} value={regionFilter} onChange={e => setRegionFilter(e.target.value)}>
+            <option value="">All Regions</option>
+            {GHANA_REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
         </div>
         
-        <div className="view-toggle" style={{ display: 'flex', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '4px' }}>
-          <button 
-            className="btn-icon" 
-            style={{ background: viewMode === 'grid' ? '#f3f4f6' : 'transparent', color: viewMode === 'grid' ? 'var(--text-main)' : 'var(--text-muted)' }} 
-            onClick={() => setViewMode('grid')}
-          >
-            <LayoutGrid size={18} />
-          </button>
-          <button 
-            className="btn-icon" 
-            style={{ background: viewMode === 'table' ? '#f3f4f6' : 'transparent', color: viewMode === 'table' ? 'var(--text-main)' : 'var(--text-muted)' }} 
-            onClick={() => setViewMode('table')}
-          >
-            <List size={18} />
-          </button>
+        <div className="toolbar-actions">
+          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>{uniqueLeaderIds.size} Leaders Found</span>
+          <div style={{ display: 'flex', background: 'var(--bg-app)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+            <button className="btn-icon" style={{ borderRadius: 0, background: viewMode === 'table' ? 'white' : 'transparent', color: viewMode === 'table' ? 'var(--primary)' : 'var(--text-muted)' }} onClick={() => setViewMode('table')}><List size={18} /></button>
+            <button className="btn-icon" style={{ borderRadius: 0, background: viewMode === 'grid' ? 'white' : 'transparent', color: viewMode === 'grid' ? 'var(--primary)' : 'var(--text-muted)' }} onClick={() => setViewMode('grid')}><LayoutGrid size={18} /></button>
+          </div>
         </div>
       </div>
 
-      {viewMode === 'grid' ? (
-        <div className="grid-view" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem' }}>
-          {filteredLeaders.length === 0 ? (
-            <div className="empty-state w-100" style={{ gridColumn: '1 / -1' }}>No leaders found matching your filters.</div>
-          ) : (
-            filteredLeaders.map(item => {
-              const { dancer, assignments } = item;
-              return (
-                <div key={dancer.id} className="card">
-                  <div className="d-flex gap-3 mb-3">
-                    <div className="list-avatar" style={{ width: 56, height: 56, flexShrink: 0, fontSize: '1.5rem', background: dancer.photo ? 'transparent' : 'var(--primary-light)' }}>
-                      {dancer.photo ? (
-                        <img src={dancer.photo} alt={dancer.name} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
-                      ) : (
-                        dancer.name.charAt(0)
-                      )}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                      <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: '0 0 0.25rem 0', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {dancer.name}
-                      </h3>
-                      <div className="d-flex align-items-center gap-1" style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                        <MapPin size={14} />
-                        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{dancer.town ? `${dancer.town}, ` : ''}{dancer.region}</span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="clean-list" style={{ gap: '0.75rem', marginBottom: '1.5rem' }}>
-                    {assignments.map((assignment, idx) => (
-                      <div key={idx} style={{ background: '#f9fafb', borderRadius: 'var(--radius-sm)', padding: '0.75rem' }}>
-                        <div className="d-flex align-items-center gap-2 mb-2" style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: '0.9rem' }}>
-                          <Users size={16} className="text-muted" />
-                          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {assignment.ministry ? assignment.ministry.name : 'Unknown Ministry'}
-                          </span>
-                        </div>
-                        <div className="d-flex flex-wrap gap-2">
-                          {assignment.roles.filter(r => ['ministry_leader', 'assistant_leader', 'choreographer', 'instructor'].includes(r)).map(role => (
-                            <span key={role} className="badge badge-subtle" style={{ background: role === 'ministry_leader' ? '#fef3c7' : '#f3f4f6', color: role === 'ministry_leader' ? '#d97706' : 'var(--text-body)' }}>
-                              {getRoleLabel(role)}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  
-                  <div className="d-flex align-items-center justify-content-center gap-4 mt-auto" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
-                    {dancer.phone && (
-                      <a href={`tel:${dancer.phone}`} className="btn-icon" style={{ color: 'var(--text-main)' }} title={formatPhoneDisplay(dancer.phone)}>
-                        <Phone size={18} />
-                      </a>
-                    )}
-                    {dancer.whatsapp && (
-                      <a href={getWhatsAppLink(dancer.whatsapp)} target="_blank" rel="noopener noreferrer" className="btn-icon" style={{ color: '#16a34a' }} title="WhatsApp">
-                        <MessageCircle size={18} />
-                      </a>
-                    )}
-                    {dancer.email && (
-                      <a href={`mailto:${dancer.email}`} className="btn-icon" style={{ color: 'var(--text-main)' }} title={dancer.email}>
-                        <Mail size={18} />
-                      </a>
-                    )}
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      ) : (
-        <div className="table-container">
-          <table className="custom-table">
-            <thead>
-              <tr>
-                <th>Leader Name</th>
-                <th>Ministry & Roles</th>
-                <th>Contact</th>
-                <th>Location</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredLeaders.length === 0 ? (
+      <div className="card">
+        {filteredLeaders.length === 0 ? (
+          <div className="empty-state">No leaders match your criteria.</div>
+        ) : viewMode === 'table' ? (
+          <div className="table-wrapper">
+            <table className="data-table">
+              <thead>
                 <tr>
-                  <td colSpan="4">
-                    <div className="empty-state">No leaders found.</div>
-                  </td>
+                  <th>Leader</th>
+                  <th>Role</th>
+                  <th>Ministry</th>
+                  <th>Contact</th>
+                  <th>Location</th>
+                  <th>Status</th>
+                  <th className="text-right">Actions</th>
                 </tr>
-              ) : (
-                filteredLeaders.map(item => {
-                  const { dancer, assignments } = item;
+              </thead>
+              <tbody>
+                {filteredLeaders.map((leader, index) => {
+                  const isActive = leader.status === 'Active';
+                  // Use index as key because one leader can have multiple roles in different ministries
+                  const menuOpen = activeMenuId === index;
+
                   return (
-                    <tr key={dancer.id}>
+                    <tr key={index} style={{ opacity: isActive ? 1 : 0.6 }}>
                       <td>
-                        <div className="d-flex align-items-center gap-3">
-                          <div className="list-avatar" style={{ width: 40, height: 40, fontSize: '1rem', background: dancer.photo ? 'transparent' : 'var(--primary-light)' }}>
-                            {dancer.photo ? (
-                              <img src={dancer.photo} alt={dancer.name} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
-                            ) : (
-                              dancer.name.charAt(0)
-                            )}
+                        <div className="cell-identity">
+                          <div className="avatar">
+                            {leader.photo ? <img src={leader.photo} alt={leader.name} /> : leader.name.charAt(0)}
                           </div>
-                          <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{dancer.name}</span>
+                          <span className="identity-primary">{leader.name}</span>
                         </div>
                       </td>
                       <td>
-                        <div className="d-flex flex-column gap-3">
-                          {assignments.map((assignment, idx) => (
-                            <div key={idx}>
-                              <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-main)', marginBottom: '0.25rem' }}>
-                                {assignment.ministry ? assignment.ministry.name : 'Unknown'}
-                              </div>
-                              <div className="d-flex flex-wrap gap-2">
-                                {assignment.roles.filter(r => ['ministry_leader', 'assistant_leader', 'choreographer', 'instructor'].includes(r)).map(role => (
-                                  <span key={role} className="badge badge-subtle" style={{ background: role === 'ministry_leader' ? '#fef3c7' : '#f3f4f6', color: role === 'ministry_leader' ? '#d97706' : 'var(--text-body)' }}>
-                                    {getRoleLabel(role)}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          ))}
+                        <span className="badge badge-orange">{getRoleLabel(leader.role)}</span>
+                      </td>
+                      <td>
+                        {leader.ministryName ? <span className="td-main">{leader.ministryName}</span> : <span className="td-quiet">General Leader</span>}
+                      </td>
+                      <td>
+                        <div className="cell-stack">
+                          <span className="stack-primary">{formatPhoneDisplay(leader.phone)}</span>
+                          {leader.whatsapp && leader.whatsapp !== leader.phone && (
+                            <a href={getWhatsAppLink(leader.whatsapp)} target="_blank" rel="noopener noreferrer" className="stack-wa">
+                              <Phone size={12} /> WhatsApp
+                            </a>
+                          )}
                         </div>
                       </td>
                       <td>
-                        <div className="d-flex flex-column gap-2" style={{ fontSize: '0.85rem', color: 'var(--text-body)' }}>
-                          {dancer.phone && <div className="d-flex align-items-center gap-2"><Phone size={14} className="text-muted" /> <a href={`tel:${dancer.phone}`} style={{ color: 'inherit', textDecoration: 'none' }}>{formatPhoneDisplay(dancer.phone)}</a></div>}
-                          {dancer.email && <div className="d-flex align-items-center gap-2"><Mail size={14} className="text-muted" /> <a href={`mailto:${dancer.email}`} style={{ color: 'inherit', textDecoration: 'none' }}>{dancer.email}</a></div>}
+                        <div className="cell-stack">
+                          <span className="stack-primary">{leader.town || 'Unknown'}</span>
+                          {leader.region && <span className="stack-secondary"><MapPin size={12}/> {leader.region}</span>}
                         </div>
                       </td>
-                      <td style={{ color: 'var(--text-body)' }}>
-                        {dancer.town ? `${dancer.town}, ` : ''}{dancer.region}
+                      <td>
+                        <div className="status-indicator">
+                          <span className={`status-dot ${isActive ? 'active' : 'inactive'}`}></span>
+                          {isActive ? 'Active' : 'Inactive'}
+                        </div>
+                      </td>
+                      <td className="text-right">
+                        <div className="action-menu-wrapper">
+                          <button className="btn-icon" onClick={() => setActiveMenuId(menuOpen ? null : index)}>
+                            <MoreVertical size={18} />
+                          </button>
+                          {menuOpen && (
+                            <>
+                              <div className="action-overlay" onClick={() => setActiveMenuId(null)}></div>
+                              <div className="action-dropdown">
+                                <button onClick={() => { onViewDancer(leader); setActiveMenuId(null); }}><Eye size={16} /> View Profile</button>
+                              </div>
+                            </>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="data-grid">
+            {filteredLeaders.map((leader, index) => {
+              const isActive = leader.status === 'Active';
+              const menuOpen = activeMenuId === index;
+              return (
+                <div key={index} className="data-grid-card" style={{ opacity: isActive ? 1 : 0.6 }}>
+                  <div className="d-flex justify-between align-center">
+                    <div className="cell-identity">
+                      <div className="avatar">
+                        {leader.photo ? <img src={leader.photo} alt={leader.name} /> : leader.name.charAt(0)}
+                      </div>
+                      <div className="identity-text">
+                        <span className="identity-primary">{leader.name}</span>
+                        <span className="identity-secondary">{getRoleLabel(leader.role)}</span>
+                      </div>
+                    </div>
+                    <div className="action-menu-wrapper">
+                      <button className="btn-icon" onClick={() => setActiveMenuId(menuOpen ? null : index)}><MoreVertical size={18} /></button>
+                      {menuOpen && (
+                        <>
+                          <div className="action-overlay" onClick={() => setActiveMenuId(null)}></div>
+                          <div className="action-dropdown">
+                            <button onClick={() => { onViewDancer(leader); setActiveMenuId(null); }}><Eye size={16} /> View Profile</button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <div className="d-flex flex-column gap-2 mt-4">
+                    {leader.ministryName && (
+                      <div className="d-flex justify-between">
+                        <span className="td-quiet">Ministry</span>
+                        <span className="td-main" style={{ fontSize: '0.85rem', textAlign: 'right' }}>{leader.ministryName}</span>
+                      </div>
+                    )}
+                    <div className="d-flex justify-between">
+                      <span className="td-quiet">Contact</span>
+                      <span className="td-main" style={{ fontSize: '0.85rem' }}>{formatPhoneDisplay(leader.phone)}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
