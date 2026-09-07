@@ -68,7 +68,7 @@ export default function Login({ onLoginSuccess }) {
             GH Dance Ministers
           </h2>
           <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-            Member Database Portal Sign In
+            GH Dance Ministers Database Portal Sign In
           </p>
         </div>
 
@@ -151,7 +151,7 @@ export default function Login({ onLoginSuccess }) {
         </form>
 
         <div style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-          🔒 Protected by Member Database Access Controls
+          🔒 Protected by GH Dance Ministers Database Access Controls
         </div>
       </div>
     </div>

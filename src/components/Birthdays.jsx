@@ -1,262 +1,227 @@
-import React, { useState } from 'react';
-import { Cake, Gift, Calendar, Sparkles, Mail, Phone, Heart, Award, PartyPopper } from 'lucide-react';
-import confetti from 'canvas-confetti';
-import { getBirthdayStatus, formatFullDate } from '../utils/birthdayUtils';
+import React, { useState, useMemo } from 'react';
+import { Search, Cake, Filter, Eye, AlertCircle } from 'lucide-react';
+import { getBirthdayInfo, isBirthdayInMonth } from '../utils/birthdayUtils';
+import { getDancerPrimaryMinistry } from '../services/dataService';
+import { MONTH_NAMES } from '../utils/constants';
 
-export default function Birthdays({ members, onViewMember }) {
-  const [activeTab, setActiveTab] = useState('all');
+export default function Birthdays({ dancers, memberships, ministries, onViewDancer }) {
+  const [activeTab, setActiveTab] = useState('next30'); // 'today', 'next7', 'next30', 'all'
+  const [selectedMonth, setSelectedMonth] = useState('all'); // 'all' or 1-12
+  const [searchTerm, setSearchTerm] = useState('');
 
-  // Trigger celebration confetti
-  const handleTriggerConfetti = () => {
-    confetti({
-      particleCount: 100,
-      spread: 70,
-      origin: { y: 0.6 }
+  const processedDancers = useMemo(() => {
+    return dancers
+      .map(dancer => {
+        const primaryMinistry = getDancerPrimaryMinistry(dancer.id, memberships, ministries);
+        const bDayInfo = getBirthdayInfo(dancer.birthdayDay, dancer.birthdayMonth, dancer.birthYear);
+        return {
+          ...dancer,
+          ministryName: primaryMinistry ? primaryMinistry.name : 'No Ministry',
+          bDayInfo
+        };
+      })
+      .filter(dancer => dancer.bDayInfo !== null) // Exclude unknown birthdays
+      .sort((a, b) => {
+        // For "All" view, sort by month then day. Otherwise sort by daysUntil
+        if (activeTab === 'all' && selectedMonth === 'all') {
+          if (a.birthdayMonth !== b.birthdayMonth) return a.birthdayMonth - b.birthdayMonth;
+          return a.birthdayDay - b.birthdayDay;
+        }
+        return a.bDayInfo.daysUntil - b.bDayInfo.daysUntil;
+      });
+  }, [dancers, memberships, ministries, activeTab, selectedMonth]);
+
+  const filteredDancers = useMemo(() => {
+    return processedDancers.filter(dancer => {
+      // Name search
+      if (searchTerm && !dancer.name.toLowerCase().includes(searchTerm.toLowerCase())) {
+        return false;
+      }
+      
+      // If a specific month is selected, only filter by that month (ignore the tab)
+      if (selectedMonth !== 'all') {
+        return isBirthdayInMonth(dancer.birthdayMonth, parseInt(selectedMonth));
+      }
+      
+      // Otherwise apply tab filters
+      const days = dancer.bDayInfo.daysUntil;
+      if (activeTab === 'today') return days === 0;
+      if (activeTab === 'next7') return days >= 0 && days <= 7;
+      if (activeTab === 'next30') return days >= 0 && days <= 30;
+      
+      return true; // 'all' tab
     });
+  }, [processedDancers, activeTab, selectedMonth, searchTerm]);
+
+  // Handle tab click (resets month filter)
+  const handleTabClick = (tab) => {
+    setActiveTab(tab);
+    setSelectedMonth('all');
   };
 
-  // Group members by birthday status
-  const todayList = members.filter(m => getBirthdayStatus(m.dob).status === 'today');
-  const tomorrowList = members.filter(m => getBirthdayStatus(m.dob).status === 'tomorrow');
-  const thisWeekList = members.filter(m => getBirthdayStatus(m.dob).status === 'this_week');
-  const thisMonthList = members.filter(m => getBirthdayStatus(m.dob).status === 'this_month');
-
-  // Sort upcoming list chronologically
-  const upcomingSorted = [...members]
-    .map(m => ({ member: m, bday: getBirthdayStatus(m.dob) }))
-    .sort((a, b) => a.bday.daysUntil - b.bday.daysUntil);
+  // Handle month change (resets tab to 'all' if a specific month is chosen)
+  const handleMonthChange = (e) => {
+    const val = e.target.value;
+    setSelectedMonth(val);
+    if (val !== 'all') {
+      setActiveTab('all');
+    }
+  };
 
   return (
-    <div>
-      {/* Hero Header Banner */}
-      <div 
-        className="hero-banner" 
-        style={{ 
-          background: 'linear-gradient(135deg, #f43f5e 0%, #e11d48 50%, #be123c 100%)',
-          boxShadow: '0 8px 24px -4px rgba(225, 29, 72, 0.3)'
-        }}
-      >
-        <div className="hero-text">
-          <h2>🎂 Member Birthday Tracking Hub</h2>
-          <p>Automatically track upcoming birthdays and never miss celebrating organization members.</p>
+    <div className="d-flex flex-column gap-4">
+      
+      {/* Page Header */}
+      <div className="page-header">
+        <div>
+          <h1 className="page-header-title">Birthday Hub</h1>
+          <p className="page-header-subtitle">
+            Track and celebrate the upcoming birthdays of your dancers and leaders.
+          </p>
         </div>
-        <button className="btn-hero" style={{ color: '#be123c' }} onClick={handleTriggerConfetti}>
-          <PartyPopper size={18} />
-          <span>Send Celebration Wishes</span>
+      </div>
+
+      {/* Tabs Row */}
+      <div className="tabs-bar">
+        <button className={`tab-item ${activeTab === 'today' && selectedMonth === 'all' ? 'active' : ''}`} onClick={() => handleTabClick('today')}>
+          Today
+        </button>
+        <button className={`tab-item ${activeTab === 'next7' && selectedMonth === 'all' ? 'active' : ''}`} onClick={() => handleTabClick('next7')}>
+          Next 7 Days
+        </button>
+        <button className={`tab-item ${activeTab === 'next30' && selectedMonth === 'all' ? 'active' : ''}`} onClick={() => handleTabClick('next30')}>
+          Next 30 Days
+        </button>
+        <button className={`tab-item ${activeTab === 'all' || selectedMonth !== 'all' ? 'active' : ''}`} onClick={() => handleTabClick('all')}>
+          All Birthdays
         </button>
       </div>
 
-      {/* Overview Birthday Stat Pills */}
-      <div className="stats-grid">
-        <div className="stat-card" style={{ borderColor: todayList.length > 0 ? '#f43f5e' : undefined, background: todayList.length > 0 ? '#fff1f2' : undefined }}>
-          <div className="stat-header">
-            <span className="stat-title" style={{ color: todayList.length > 0 ? '#be123c' : undefined }}>Birthday Today</span>
-            <div className="stat-icon-bg" style={{ background: '#ffe4e6', color: '#e11d48' }}>
-              <Gift size={20} />
-            </div>
+      {/* Controls Bar */}
+      <div className="toolbar" style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+        <div className="filters-group" style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', flex: 1 }}>
+          <div className="search-bar-container" style={{ display: 'block' }}>
+            <Search size={18} className="search-icon" />
+            <input 
+              type="text" 
+              className="search-input" 
+              placeholder="Search dancer name..." 
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+            />
           </div>
-          <div className="stat-value" style={{ color: todayList.length > 0 ? '#be123c' : undefined }}>{todayList.length}</div>
-          <div className="stat-footer">
-            <span className="trend-badge positive" style={{ background: todayList.length > 0 ? '#fecdd3' : undefined, color: todayList.length > 0 ? '#be123c' : undefined }}>
-              {todayList.length > 0 ? 'Celebrate Now!' : 'None today'}
-            </span>
-          </div>
+          
+          <select 
+            className="form-control" 
+            style={{ width: '180px' }}
+            value={selectedMonth} 
+            onChange={handleMonthChange}
+          >
+            <option value="all">All Months</option>
+            {MONTH_NAMES.map((m, i) => (
+              <option key={m} value={i + 1}>{m}</option>
+            ))}
+          </select>
         </div>
-
-        <div className="stat-card">
-          <div className="stat-header">
-            <span className="stat-title">Birthday Tomorrow</span>
-            <div className="stat-icon-bg" style={{ background: '#fef3c7', color: '#d97706' }}>
-              <Cake size={20} />
-            </div>
-          </div>
-          <div className="stat-value">{tomorrowList.length}</div>
-          <div className="stat-footer">
-            <span className="trend-badge neutral">Next 24 Hours</span>
-          </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-header">
-            <span className="stat-title">This Week</span>
-            <div className="stat-icon-bg" style={{ background: '#e0e7ff', color: '#4f46e5' }}>
-              <Calendar size={20} />
-            </div>
-          </div>
-          <div className="stat-value">{thisWeekList.length + todayList.length + tomorrowList.length}</div>
-          <div className="stat-footer">
-            <span className="trend-badge positive">Next 7 Days</span>
-          </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-header">
-            <span className="stat-title">This Month</span>
-            <div className="stat-icon-bg" style={{ background: '#f3e8ff', color: '#9333ea' }}>
-              <Sparkles size={20} />
-            </div>
-          </div>
-          <div className="stat-value">{thisMonthList.length + thisWeekList.length + todayList.length + tomorrowList.length}</div>
-          <div className="stat-footer">
-            <span className="trend-badge neutral">Next 30 Days</span>
-          </div>
+        
+        <div className="text-muted small fw-bold">
+          {filteredDancers.length} birthday{filteredDancers.length !== 1 ? 's' : ''} found
         </div>
       </div>
 
-      {/* Section 1: Birthday Today Featured Spotlight */}
-      {todayList.length > 0 && (
-        <div style={{ marginBottom: '2rem' }}>
-          <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#be123c', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Gift size={20} /> Celebrating Today 🎉
-          </h3>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
-            {todayList.map(member => {
-              const bday = getBirthdayStatus(member.dob);
-              return (
-                <div 
-                  key={member.id} 
-                  className="card" 
-                  style={{ 
-                    background: 'linear-gradient(135deg, #ffffff 0%, #fff1f2 100%)', 
-                    borderColor: '#fecdd3',
-                    borderWidth: '2px',
-                    position: 'relative'
-                  }}
-                >
-                  <span className="badge badge-danger" style={{ position: 'absolute', top: '1rem', right: '1rem' }}>
-                    Turning {bday.turningAge} Today!
-                  </span>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
-                    <img
-                      src={member.photo || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80'}
-                      alt={member.name}
-                      style={{ width: '70px', height: '70px', borderRadius: '50%', objectFit: 'cover', border: '3px solid #f43f5e' }}
-                    />
-                    <div>
-                      <h4 style={{ fontSize: '1.1rem', fontWeight: 800 }}>{member.name}</h4>
-                      <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{member.department || 'Member'}</p>
-                      <div style={{ fontSize: '0.8rem', color: '#be123c', fontWeight: 700, marginTop: '2px' }}>
-                        🎂 Born: {formatFullDate(member.dob)}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <a href={`mailto:${member.email}?subject=Happy Birthday from Organization!`} className="btn btn-primary btn-sm" style={{ flex: 1, background: '#e11d48', borderColor: '#e11d48', textDecoration: 'none' }}>
-                      <Mail size={14} /> Send Email Wish
-                    </a>
-                    {member.phone && (
-                      <a href={`tel:${member.phone}`} className="btn btn-secondary btn-sm" style={{ textDecoration: 'none' }}>
-                        <Phone size={14} /> Call
-                      </a>
-                    )}
-                    <button className="btn btn-secondary btn-sm" onClick={() => onViewMember(member)}>
-                      Profile
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Section 2: All Upcoming Birthdays Timeline */}
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-          <div>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>Chronological Birthday Calendar</h3>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Upcoming member birthdays ordered by date</p>
-          </div>
-
-          <div className="tabs-bar" style={{ marginBottom: 0 }}>
-            <button className={`tab-item ${activeTab === 'all' ? 'active' : ''}`} onClick={() => setActiveTab('all')}>
-              All Upcoming ({upcomingSorted.length})
-            </button>
-            <button className={`tab-item ${activeTab === 'tomorrow' ? 'active' : ''}`} onClick={() => setActiveTab('tomorrow')}>
-              Tomorrow ({tomorrowList.length})
-            </button>
-            <button className={`tab-item ${activeTab === 'week' ? 'active' : ''}`} onClick={() => setActiveTab('week')}>
-              This Week ({thisWeekList.length + todayList.length + tomorrowList.length})
-            </button>
-          </div>
-        </div>
-
-        <div className="table-container" style={{ border: 'none' }}>
+      {/* Results */}
+      <div className="card">
+        <div className="table-container" style={{ border: 'none', borderRadius: 0 }}>
           <table className="custom-table">
             <thead>
               <tr>
-                <th>Member</th>
-                <th>Department</th>
-                <th>Birth Date</th>
-                <th>Turning Age</th>
-                <th>Days Until Birthday</th>
+                <th>Dancer Name</th>
+                <th>Ministry</th>
+                <th>Birthday</th>
+                <th>Status</th>
+                <th>Permissions</th>
                 <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {upcomingSorted.map(({ member, bday }) => {
-                if (activeTab === 'tomorrow' && bday.status !== 'tomorrow') return null;
-                if (activeTab === 'week' && bday.daysUntil > 7) return null;
-
-                return (
-                  <tr key={member.id} style={{ background: bday.status === 'today' ? '#fff1f2' : undefined }}>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <img
-                          src={member.photo || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80'}
-                          alt={member.name}
-                          className="avatar"
-                        />
-                        <div>
-                          <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>{member.name}</div>
-                          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{member.email}</div>
+              {filteredDancers.length === 0 ? (
+                <tr>
+                  <td colSpan="6">
+                    <div className="empty-state">
+                      <p>No birthdays found for the selected filter.</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                filteredDancers.map(dancer => {
+                  const isToday = dancer.bDayInfo.daysUntil === 0;
+                  const isTomorrow = dancer.bDayInfo.daysUntil === 1;
+                  const isSoon = dancer.bDayInfo.daysUntil > 1 && dancer.bDayInfo.daysUntil <= 7;
+                  
+                  return (
+                    <tr key={dancer.id} style={{ background: isToday ? '#fff1f2' : 'transparent' }}>
+                      <td>
+                        <div className="d-flex align-items-center gap-3">
+                          <div className="list-avatar" style={{ width: 40, height: 40, fontSize: '0.9rem', background: dancer.photo ? 'transparent' : 'var(--primary-light)' }}>
+                            {dancer.photo ? (
+                              <img src={dancer.photo} alt={dancer.name} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                            ) : (
+                              dancer.name.charAt(0)
+                            )}
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 700, color: isToday ? '#e11d48' : 'var(--text-main)' }}>
+                              {dancer.name} {isToday && <Cake size={14} style={{ display: 'inline', marginLeft: '4px', color: '#e11d48' }} />}
+                            </div>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                              {dancer.bDayInfo.currentAge !== null ? `Turning ${dancer.bDayInfo.currentAge}` : 'Age unknown'}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </td>
-
-                    <td>
-                      <span className="badge badge-purple">{member.department || 'General'}</span>
-                    </td>
-
-                    <td>
-                      <div style={{ fontWeight: 700, fontSize: '0.88rem' }}>
-                        {bday.formattedNextBirthday}
-                      </div>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                        Original: {formatFullDate(member.dob)}
-                      </div>
-                    </td>
-
-                    <td>
-                      <span className="badge badge-gray">Turning {bday.turningAge}</span>
-                    </td>
-
-                    <td>
-                      {bday.status === 'today' ? (
-                        <span className="badge badge-danger">🎉 Birthday Today!</span>
-                      ) : bday.status === 'tomorrow' ? (
-                        <span className="badge badge-warning">🎂 Tomorrow!</span>
-                      ) : (
-                        <span className="badge badge-info">In {bday.daysUntil} days</span>
-                      )}
-                    </td>
-
-                    <td style={{ textAlign: 'right' }}>
-                      <div style={{ display: 'inline-flex', gap: '0.35rem' }}>
-                        <a href={`mailto:${member.email}`} className="btn btn-secondary btn-sm" title="Send Email Wish">
-                          <Mail size={14} /> Wish
-                        </a>
-                        <button className="btn btn-secondary btn-sm" onClick={() => onViewMember(member)}>
-                          View Profile
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+                      </td>
+                      <td style={{ color: 'var(--text-main)', fontWeight: 500 }}>
+                        {dancer.ministryName}
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>
+                          {dancer.bDayInfo.formattedBirthday}
+                        </div>
+                      </td>
+                      <td>
+                        <div style={{ 
+                          fontWeight: 600, 
+                          color: isToday ? '#e11d48' : isTomorrow ? '#d97706' : isSoon ? '#0284c7' : 'var(--text-muted)' 
+                        }}>
+                          {isToday ? 'Today!' : isTomorrow ? 'Tomorrow' : `In ${dancer.bDayInfo.daysUntil} days`}
+                        </div>
+                      </td>
+                      <td>
+                        <div className="d-flex flex-column gap-1" style={{ fontSize: '0.8rem' }}>
+                          <div className="d-flex align-items-center gap-2">
+                            <div className={`dot-indicator ${dancer.allowBirthdayPublication ? 'dot-success' : 'dot-danger'}`} />
+                            <span style={{ color: dancer.allowBirthdayPublication ? 'var(--text-main)' : 'var(--text-muted)' }}>
+                              {dancer.allowBirthdayPublication ? 'Birth Date Public' : 'Birth Date Private'}
+                            </span>
+                          </div>
+                          <div className="d-flex align-items-center gap-2">
+                            <div className={`dot-indicator ${dancer.allowPhotoPublication ? 'dot-success' : 'dot-danger'}`} />
+                            <span style={{ color: dancer.allowPhotoPublication ? 'var(--text-main)' : 'var(--text-muted)' }}>
+                              {dancer.allowPhotoPublication ? 'Photo Public' : 'Photo Private'}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="d-flex justify-content-end">
+                          <button className="btn btn-secondary btn-sm" onClick={() => onViewDancer(dancer)}>
+                            <Eye size={16} className="me-2" /> View
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>

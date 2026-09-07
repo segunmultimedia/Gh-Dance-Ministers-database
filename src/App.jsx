@@ -2,78 +2,140 @@ import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
-import Members from './components/Members';
+import Dancers from './components/Dancers';
 import Birthdays from './components/Birthdays';
 import Leaders from './components/Leaders';
-import FileManager from './components/FileManager';
+import Ministries from './components/Ministries';
+import MinistryModal from './components/MinistryModal';
+import ExcelImport from './components/ExcelImport';
 import Reports from './components/Reports';
 import Settings from './components/Settings';
 import Login from './components/Login';
-import MemberModal from './components/MemberModal';
-import MemberDetailModal from './components/MemberDetailModal';
-import LeaderModal from './components/LeaderModal';
-import FlyerStudio from './components/FlyerStudio';
+import DancerModal from './components/DancerModal';
+import DancerDetailModal from './components/DancerDetailModal';
+import MigrationWarning from './components/MigrationWarning';
 
-import { 
-  seedInitialDataIfNeeded, 
-  getAllMembers, 
-  addMember, 
-  updateMember, 
-  deleteMember, 
-  getAllLeaders,
-  addLeader,
-  updateLeader,
-  deleteLeader,
-  getAllFiles, 
-  saveFile, 
-  deleteFile 
-} from './services/db';
+import {
+  getCurrentDBVersion,
+  exportV2Data,
+  initDB,
+  seedInitialDataIfNeeded,
+  getAllDancers,
+  addDancer,
+  updateDancer,
+  deactivateDancer,
+  deleteDancer,
+  getAllMinistries,
+  addMinistry,
+  updateMinistry,
+  deactivateMinistry,
+  getAllMemberships,
+  addMembership,
+  updateMembership,
+  removeMembership,
+  canDeleteDancer,
+  canDeleteMinistry,
+  getMinistryLeaders,
+} from './services/dataService';
 
-import { getBirthdayStatus } from './utils/birthdayUtils';
+import { getBirthdayInfo } from './utils/birthdayUtils';
+import { normalizeGhanaPhone } from './utils/phoneUtils';
+import { LEADERSHIP_ROLES } from './utils/constants';
 
 export default function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    return localStorage.getItem('admin_authenticated') === 'true';
-  });
+  // Auth state
+  const [isAuthenticated, setIsAuthenticated] = useState(() =>
+    localStorage.getItem('admin_authenticated') === 'true'
+  );
   const [adminUser, setAdminUser] = useState(() => {
     const saved = localStorage.getItem('admin_user');
     return saved ? JSON.parse(saved) : null;
   });
 
+  // Navigation
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [members, setMembers] = useState([]);
-  const [leaders, setLeaders] = useState([]);
-  const [files, setFiles] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
-  // Modals state
-  const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
-  const [memberToEdit, setMemberToEdit] = useState(null);
-  const [selectedMemberForDetail, setSelectedMemberForDetail] = useState(null);
+  // Data state
+  const [dancers, setDancers] = useState([]);
+  const [ministries, setMinistries] = useState([]);
+  const [memberships, setMemberships] = useState([]);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
-  const [isLeaderModalOpen, setIsLeaderModalOpen] = useState(false);
-  const [leaderToEdit, setLeaderToEdit] = useState(null);
+  // Migration state
+  const [needsMigration, setNeedsMigration] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [migrationChecked, setMigrationChecked] = useState(false);
 
-  // Load Data on startup
+  // Dancer modal state
+  const [isDancerModalOpen, setIsDancerModalOpen] = useState(false);
+  const [dancerToEdit, setDancerToEdit] = useState(null);
+  const [selectedDancerForDetail, setSelectedDancerForDetail] = useState(null);
+
+  // Ministry modal state
+  const [isMinistryModalOpen, setIsMinistryModalOpen] = useState(false);
+  const [ministryToEdit, setMinistryToEdit] = useState(null);
+
+  // Check DB version on startup
   useEffect(() => {
-    async function loadData() {
-      await seedInitialDataIfNeeded();
-      await refreshAllData();
+    async function checkMigration() {
+      const version = await getCurrentDBVersion();
+      if (version > 0 && version < 3) {
+        setNeedsMigration(true);
+      } else {
+        // Either fresh install or already at v3
+        await loadData();
+      }
+      setMigrationChecked(true);
     }
-    loadData();
+    checkMigration();
   }, []);
 
-  const refreshAllData = async () => {
-    const loadedMembers = await getAllMembers();
-    const loadedLeaders = await getAllLeaders();
-    const loadedFiles = await getAllFiles();
-    setMembers(loadedMembers);
-    setLeaders(loadedLeaders);
-    setFiles(loadedFiles);
+  const loadData = async () => {
+    await initDB();
+    await seedInitialDataIfNeeded();
+    await refreshAllData();
+    setDataLoaded(true);
   };
 
-  // Auth Handlers
+  const refreshAllData = async () => {
+    const [d, m, mm] = await Promise.all([
+      getAllDancers(),
+      getAllMinistries(),
+      getAllMemberships()
+    ]);
+    setDancers(d);
+    setMinistries(m);
+    setMemberships(mm);
+  };
+
+  // --- Migration Handlers ---
+  const handleExportV2 = async () => {
+    setIsExporting(true);
+    try {
+      const data = await exportV2Data();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `GH_Dance_Backup_${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert('Export failed: ' + err.message);
+    }
+    setIsExporting(false);
+  };
+
+  const handleProceedMigration = async () => {
+    setNeedsMigration(false);
+    await loadData();
+  };
+
+  // --- Auth Handlers ---
   const handleLoginSuccess = (user) => {
     setIsAuthenticated(true);
     setAdminUser(user);
@@ -88,79 +150,225 @@ export default function App() {
     localStorage.removeItem('admin_user');
   };
 
-  // Member CRUD Handlers
-  const handleOpenAddMember = () => {
-    setMemberToEdit(null);
-    setIsMemberModalOpen(true);
+  // --- Dancer CRUD ---
+  const handleOpenAddDancer = () => {
+    setDancerToEdit(null);
+    setIsDancerModalOpen(true);
   };
 
-  const handleOpenEditMember = (member) => {
-    setMemberToEdit(member);
-    setIsMemberModalOpen(true);
+  const handleOpenEditDancer = (dancer) => {
+    setDancerToEdit(dancer);
+    setIsDancerModalOpen(true);
   };
 
-  const handleSaveMember = async (formData) => {
-    if (memberToEdit) {
-      await updateMember(memberToEdit.id, formData);
+  const handleSaveDancer = async ({ dancerData, ministryId, roles }) => {
+    let dancerId;
+    const normalizedData = {
+      ...dancerData,
+      phone: normalizeGhanaPhone(dancerData.phone),
+      whatsapp: normalizeGhanaPhone(dancerData.whatsapp || ''),
+    };
+
+    if (dancerToEdit) {
+      await updateDancer(dancerToEdit.id, normalizedData);
+      dancerId = dancerToEdit.id;
+
+      // Update primary membership if ministry changed
+      if (ministryId) {
+        const existing = memberships.find(
+          m => m.dancerId === dancerId && m.isPrimary && m.status === 'active'
+        );
+        if (existing) {
+          await updateMembership(existing.id, {
+            ministryId,
+            roles: roles || existing.roles,
+          });
+        } else {
+          await addMembership({
+            dancerId,
+            ministryId,
+            roles: roles || ['dancer'],
+            isPrimary: true,
+            dateJoined: normalizedData.dateJoined || '',
+            status: 'active',
+          });
+        }
+      }
     } else {
-      await addMember(formData);
+      const newDancer = await addDancer(normalizedData);
+      dancerId = newDancer.id;
+
+      // Create membership if ministry selected
+      if (ministryId) {
+        await addMembership({
+          dancerId,
+          ministryId,
+          roles: roles || ['dancer'],
+          isPrimary: true,
+          dateJoined: normalizedData.dateJoined || '',
+          status: 'active',
+        });
+      }
     }
-    setIsMemberModalOpen(false);
-    setMemberToEdit(null);
+
+    setIsDancerModalOpen(false);
+    setDancerToEdit(null);
     await refreshAllData();
   };
 
-  const handleDeleteMember = async (id) => {
-    if (confirm('Are you sure you want to delete this member record?')) {
-      await deleteMember(id);
-      await refreshAllData();
-    }
-  };
-
-  // Leader CRUD Handlers
-  const handleOpenAddLeader = () => {
-    setLeaderToEdit(null);
-    setIsLeaderModalOpen(true);
-  };
-
-  const handleOpenEditLeader = (leader) => {
-    setLeaderToEdit(leader);
-    setIsLeaderModalOpen(true);
-  };
-
-  const handleSaveLeader = async (formData) => {
-    if (leaderToEdit) {
-      await updateLeader(leaderToEdit.id, formData);
+  const handleDeleteDancer = async (id) => {
+    const safe = canDeleteDancer(id, memberships);
+    if (safe) {
+      if (confirm('Are you sure you want to permanently delete this dancer record?')) {
+        await deleteDancer(id);
+        await refreshAllData();
+      }
     } else {
-      await addLeader(formData);
+      if (confirm('This dancer has active ministry memberships. Deactivate instead of delete?')) {
+        await deactivateDancer(id);
+        await refreshAllData();
+      }
     }
-    setIsLeaderModalOpen(false);
-    setLeaderToEdit(null);
+  };
+
+  // --- Ministry CRUD ---
+  const handleOpenAddMinistry = () => {
+    setMinistryToEdit(null);
+    setIsMinistryModalOpen(true);
+  };
+
+  const handleOpenEditMinistry = (ministry) => {
+    setMinistryToEdit(ministry);
+    setIsMinistryModalOpen(true);
+  };
+
+  const handleSaveMinistry = async ({ ministryData, leaderId, assistantLeaderId }) => {
+    let ministryId;
+
+    if (ministryToEdit) {
+      await updateMinistry(ministryToEdit.id, ministryData);
+      ministryId = ministryToEdit.id;
+    } else {
+      const newMinistry = await addMinistry(ministryData);
+      ministryId = newMinistry.id;
+    }
+
+    // Handle leader assignment
+    if (leaderId) {
+      const existingLeader = memberships.find(
+        m => m.ministryId === ministryId && (m.roles || []).includes('ministry_leader') && m.status === 'active'
+      );
+      if (existingLeader && existingLeader.dancerId !== leaderId) {
+        // Remove old leader role
+        const newRoles = (existingLeader.roles || []).filter(r => r !== 'ministry_leader');
+        if (newRoles.length > 0) {
+          await updateMembership(existingLeader.id, { roles: newRoles });
+        } else {
+          await removeMembership(existingLeader.id);
+        }
+      }
+      // Assign new leader
+      const existingMembership = memberships.find(
+        m => m.ministryId === ministryId && m.dancerId === leaderId && m.status === 'active'
+      );
+      if (existingMembership) {
+        const roles = new Set(existingMembership.roles || []);
+        roles.add('ministry_leader');
+        roles.add('dancer');
+        await updateMembership(existingMembership.id, { roles: Array.from(roles) });
+      } else {
+        await addMembership({
+          dancerId: leaderId,
+          ministryId,
+          roles: ['dancer', 'ministry_leader'],
+          isPrimary: false,
+          dateJoined: '',
+          status: 'active',
+        });
+      }
+    }
+
+    // Handle assistant leader assignment
+    if (assistantLeaderId) {
+      const existingAssistant = memberships.find(
+        m => m.ministryId === ministryId && (m.roles || []).includes('assistant_leader') && m.status === 'active'
+      );
+      if (existingAssistant && existingAssistant.dancerId !== assistantLeaderId) {
+        const newRoles = (existingAssistant.roles || []).filter(r => r !== 'assistant_leader');
+        if (newRoles.length > 0) {
+          await updateMembership(existingAssistant.id, { roles: newRoles });
+        } else {
+          await removeMembership(existingAssistant.id);
+        }
+      }
+      const existingMembership = memberships.find(
+        m => m.ministryId === ministryId && m.dancerId === assistantLeaderId && m.status === 'active'
+      );
+      if (existingMembership) {
+        const roles = new Set(existingMembership.roles || []);
+        roles.add('assistant_leader');
+        roles.add('dancer');
+        await updateMembership(existingMembership.id, { roles: Array.from(roles) });
+      } else {
+        await addMembership({
+          dancerId: assistantLeaderId,
+          ministryId,
+          roles: ['dancer', 'assistant_leader'],
+          isPrimary: false,
+          dateJoined: '',
+          status: 'active',
+        });
+      }
+    }
+
+    setIsMinistryModalOpen(false);
+    setMinistryToEdit(null);
     await refreshAllData();
   };
 
-  const handleDeleteLeader = async (id) => {
-    if (confirm('Are you sure you want to delete this group leader record?')) {
-      await deleteLeader(id);
+  const handleDeactivateMinistry = async (id) => {
+    if (confirm('Deactivate this ministry? Its members will retain their records.')) {
+      await deactivateMinistry(id);
       await refreshAllData();
     }
   };
 
-  // File Upload Handlers
-  const handleUploadFile = async (file) => {
-    await saveFile(file);
-    await refreshAllData();
-  };
+  // --- Computed values ---
+  const birthdaysTodayCount = dancers.filter(d =>
+    getBirthdayInfo(d.birthdayDay, d.birthdayMonth).isToday
+  ).length;
 
-  const handleDeleteFile = async (id) => {
-    if (confirm('Are you sure you want to delete this file document?')) {
-      await deleteFile(id);
-      await refreshAllData();
-    }
-  };
+  const leadersCount = (() => {
+    const leaderDancerIds = new Set();
+    memberships.forEach(m => {
+      if (m.status === 'active' && (m.roles || []).some(r => LEADERSHIP_ROLES.includes(r))) {
+        leaderDancerIds.add(m.dancerId);
+      }
+    });
+    return leaderDancerIds.size;
+  })();
 
-  // Count Birthdays Today for Sidebar/Header notifications
-  const birthdaysTodayCount = members.filter(m => getBirthdayStatus(m.dob).status === 'today').length;
+  // --- Render ---
+  if (!migrationChecked) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#f8fafc' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#4f46e5', marginBottom: '0.5rem' }}>GH Dance Ministers</div>
+          <div style={{ color: '#64748b' }}>Loading...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (needsMigration) {
+    return (
+      <MigrationWarning
+        onExport={handleExportV2}
+        onProceed={handleProceedMigration}
+        isExporting={isExporting}
+      />
+    );
+  }
 
   if (!isAuthenticated) {
     return <Login onLoginSuccess={handleLoginSuccess} />;
@@ -168,15 +376,14 @@ export default function App() {
 
   return (
     <div className="app-container">
-      {/* Sidebar Navigation */}
       <Sidebar
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={(tab) => { setActiveTab(tab); setSearchTerm(''); }}
         counts={{
-          members: members.length,
-          leaders: leaders.length,
-          files: files.length,
-          birthdaysToday: birthdaysTodayCount
+          dancers: dancers.filter(d => d.status === 'active').length,
+          ministries: ministries.filter(m => m.status === 'active').length,
+          leaders: leadersCount,
+          birthdaysToday: birthdaysTodayCount,
         }}
         adminUser={adminUser}
         onLogout={handleLogout}
@@ -184,14 +391,12 @@ export default function App() {
         setIsMobileOpen={setIsMobileOpen}
       />
 
-      {/* Main Content Workspace */}
       <div className="main-wrapper">
         <Header
           activeTab={activeTab}
           searchTerm={searchTerm}
           setSearchTerm={setSearchTerm}
-          onOpenAddMember={handleOpenAddMember}
-          onOpenUploadFile={() => setActiveTab('files')}
+          onOpenAddDancer={handleOpenAddDancer}
           toggleMobileMenu={() => setIsMobileOpen(!isMobileOpen)}
           birthdayNotificationsCount={birthdaysTodayCount}
         />
@@ -199,104 +404,122 @@ export default function App() {
         <main className="page-content">
           {activeTab === 'dashboard' && (
             <Dashboard
-              members={members}
-              files={files}
-              onViewMember={(m) => setSelectedMemberForDetail(m)}
-              onEditMember={handleOpenEditMember}
-              onDeleteMember={handleDeleteMember}
-              onOpenAddMember={handleOpenAddMember}
+              dancers={dancers}
+              ministries={ministries}
+              memberships={memberships}
+              onViewDancer={(d) => setSelectedDancerForDetail(d)}
               onNavigateToBirthdays={() => setActiveTab('birthdays')}
+              onNavigateToDancers={() => { setActiveTab('dancers'); handleOpenAddDancer(); }}
             />
           )}
 
-          {activeTab === 'members' && (
-            <Members
-              members={members}
+          {activeTab === 'dancers' && (
+            <Dancers
+              dancers={dancers}
+              ministries={ministries}
+              memberships={memberships}
               searchTerm={searchTerm}
               setSearchTerm={setSearchTerm}
-              onViewMember={(m) => setSelectedMemberForDetail(m)}
-              onEditMember={handleOpenEditMember}
-              onDeleteMember={handleDeleteMember}
-              onOpenAddMember={handleOpenAddMember}
+              onViewDancer={(d) => setSelectedDancerForDetail(d)}
+              onEditDancer={handleOpenEditDancer}
+              onDeleteDancer={handleDeleteDancer}
+              onOpenAddDancer={handleOpenAddDancer}
             />
           )}
 
           {activeTab === 'birthdays' && (
             <Birthdays
-              members={members}
-              onViewMember={(m) => setSelectedMemberForDetail(m)}
+              dancers={dancers}
+              memberships={memberships}
+              ministries={ministries}
+              onViewDancer={(d) => setSelectedDancerForDetail(d)}
+            />
+          )}
+
+          {activeTab === 'ministries' && (
+            <Ministries
+              ministries={ministries}
+              dancers={dancers}
+              memberships={memberships}
+              searchTerm={searchTerm}
+              setSearchTerm={setSearchTerm}
+              onOpenAddMinistry={handleOpenAddMinistry}
+              onEditMinistry={handleOpenEditMinistry}
+              onViewMinistry={(m) => { handleOpenEditMinistry(m); }}
+              onDeactivateMinistry={handleDeactivateMinistry}
             />
           )}
 
           {activeTab === 'leaders' && (
             <Leaders
-              leaders={leaders}
-              members={members}
-              onOpenAddLeader={handleOpenAddLeader}
-              onEditLeader={handleOpenEditLeader}
-              onDeleteLeader={handleDeleteLeader}
+              dancers={dancers}
+              ministries={ministries}
+              memberships={memberships}
               searchTerm={searchTerm}
               setSearchTerm={setSearchTerm}
             />
           )}
 
-          {activeTab === 'flyer' && (
-            <FlyerStudio
-              members={members}
-              leaders={leaders}
-            />
-          )}
-
-          {activeTab === 'files' && (
-            <FileManager
-              files={files}
-              onUploadFile={handleUploadFile}
-              onDeleteFile={handleDeleteFile}
-              searchTerm={searchTerm}
-              setSearchTerm={setSearchTerm}
+          {activeTab === 'import' && (
+            <ExcelImport
+              onImportComplete={refreshAllData}
+              ministries={ministries}
+              dancers={dancers}
             />
           )}
 
           {activeTab === 'reports' && (
             <Reports
-              members={members}
-              files={files}
+              dancers={dancers}
+              ministries={ministries}
+              memberships={memberships}
             />
           )}
 
           {activeTab === 'settings' && (
             <Settings
-              members={members}
-              files={files}
+              dancers={dancers}
+              ministries={ministries}
+              memberships={memberships}
               onRefreshData={refreshAllData}
             />
           )}
         </main>
       </div>
 
-      {/* Add / Edit Member Modal */}
-      <MemberModal
-        isOpen={isMemberModalOpen}
-        onClose={() => { setIsMemberModalOpen(false); setMemberToEdit(null); }}
-        onSave={handleSaveMember}
-        memberToEdit={memberToEdit}
+      {/* Dancer Add/Edit Modal */}
+      <DancerModal
+        isOpen={isDancerModalOpen}
+        onClose={() => { setIsDancerModalOpen(false); setDancerToEdit(null); }}
+        onSave={handleSaveDancer}
+        dancerToEdit={dancerToEdit}
+        ministries={ministries}
+        memberships={memberships}
+        onAddMinistry={() => {
+          setIsDancerModalOpen(false);
+          setIsMinistryModalOpen(true);
+        }}
       />
 
-      {/* Add / Edit Group Leader Modal */}
-      <LeaderModal
-        isOpen={isLeaderModalOpen}
-        onClose={() => { setIsLeaderModalOpen(false); setLeaderToEdit(null); }}
-        onSave={handleSaveLeader}
-        leaderToEdit={leaderToEdit}
-        members={members}
+      {/* Ministry Add/Edit Modal */}
+      <MinistryModal
+        isOpen={isMinistryModalOpen}
+        onClose={() => { setIsMinistryModalOpen(false); setMinistryToEdit(null); }}
+        onSave={handleSaveMinistry}
+        ministryToEdit={ministryToEdit}
+        ministries={ministries}
+        dancers={dancers}
+        memberships={memberships}
       />
 
-      {/* Detailed Member Profile Drawer Modal */}
-      <MemberDetailModal
-        isOpen={!!selectedMemberForDetail}
-        onClose={() => setSelectedMemberForDetail(null)}
-        member={selectedMemberForDetail}
-        onEdit={(m) => { setSelectedMemberForDetail(null); handleOpenEditMember(m); }}
+      {/* Dancer Detail Modal */}
+      <DancerDetailModal
+        isOpen={!!selectedDancerForDetail}
+        onClose={() => setSelectedDancerForDetail(null)}
+        dancer={selectedDancerForDetail}
+        ministries={ministries}
+        memberships={memberships}
+        onEdit={(d) => { setSelectedDancerForDetail(null); handleOpenEditDancer(d); }}
       />
     </div>
   );

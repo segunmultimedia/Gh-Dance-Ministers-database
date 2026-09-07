@@ -1,134 +1,149 @@
-import React, { useState } from 'react';
-import { Settings as SettingsIcon, Download, Upload, RefreshCw, Shield, Database, Save, Check } from 'lucide-react';
-import { clearAllData, seedInitialDataIfNeeded } from '../services/db';
+import React from 'react';
+import { exportAllData, clearAllData } from '../services/dataService';
+import { Settings as SettingsIcon, Database, Download, Trash2, AlertTriangle, RefreshCw, HardDrive, Shield } from 'lucide-react';
 
-export default function Settings({ members, files, onRefreshData }) {
-  const [orgName, setOrgName] = useState('Gh Dance Database');
-  const [savedSuccess, setSavedSuccess] = useState(false);
-
-  // Backup Database to JSON
-  const handleExportBackup = () => {
-    const backupData = {
-      timestamp: new Date().toISOString(),
-      organization: orgName,
-      members,
-      files: files.map(f => ({
-        id: f.id,
-        name: f.name,
-        type: f.type,
-        size: f.size,
-        uploadDate: f.uploadDate,
-        category: f.category
-      }))
-    };
-
-    const jsonString = JSON.stringify(backupData, null, 2);
-    const blob = new Blob([jsonString], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `Organization_Database_Backup_${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  // Reset to sample seed data
-  const handleResetData = async () => {
-    if (confirm('Are you sure you want to reset the database to initial sample data? This will overwrite recent edits.')) {
-      await clearAllData();
-      await seedInitialDataIfNeeded();
-      await onRefreshData();
-      alert('Database reset successfully!');
+export default function Settings({ dancers, ministries, memberships, onRefreshData }) {
+  
+  const handleExportData = async () => {
+    try {
+      const jsonData = await exportAllData();
+      const blob = new Blob([jsonData], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `gh_dance_database_backup_${new Date().toISOString().slice(0,10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error exporting data:", error);
+      alert("Failed to export data.");
     }
   };
 
-  const handleSaveSettings = (e) => {
-    e.preventDefault();
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 3000);
+  const handleClearData = async () => {
+    const confirm1 = window.confirm("WARNING: This action cannot be undone. All dancers, ministries, and memberships will be permanently deleted. Are you sure you want to proceed?");
+    if (confirm1) {
+      const confirm2 = window.prompt("Type 'DELETE' to confirm clearing all data:");
+      if (confirm2 === 'DELETE') {
+        try {
+          await clearAllData();
+          if (onRefreshData) onRefreshData();
+          alert("All data has been cleared successfully.");
+        } catch (error) {
+          console.error("Error clearing data:", error);
+          alert("Failed to clear data.");
+        }
+      } else {
+        alert("Action cancelled.");
+      }
+    }
+  };
+
+  const handleRefresh = () => {
+    if (onRefreshData) onRefreshData();
   };
 
   return (
-    <div>
-      {/* Banner */}
-      <div 
-        className="hero-banner"
-        style={{ 
-          background: 'linear-gradient(135deg, #334155 0%, #1e293b 50%, #0f172a 100%)',
-          boxShadow: '0 8px 24px -4px rgba(30, 41, 59, 0.3)'
-        }}
-      >
-        <div className="hero-text">
-          <h2>⚙️ System Settings & Data Storage</h2>
-          <p>Manage organization profile, backup local database, and configure preferences.</p>
+    <div className="d-flex flex-column gap-4">
+      
+      {/* Page Header */}
+      <div className="page-header">
+        <div>
+          <h1 className="page-header-title">Settings & Data Management</h1>
+          <p className="page-header-subtitle">
+            Manage your local database, backups, and application preferences.
+          </p>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
+      <div className="dashboard-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '2rem' }}>
         
-        {/* Organization Preferences */}
+        {/* Database Overview */}
         <div className="card">
-          <h3 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Shield size={20} className="text-primary" /> Organization Profile
-          </h3>
-
-          <form onSubmit={handleSaveSettings}>
-            <div className="form-group">
-              <label className="form-label">Organization Name</label>
-              <input
-                type="text"
-                className="form-control"
-                value={orgName}
-                onChange={(e) => setOrgName(e.target.value)}
-              />
+          <div className="card-header">
+            <h3 className="card-title"><Database size={20} style={{ color: '#9ca3af' }} /> Database Overview</h3>
+          </div>
+          <div className="clean-list">
+            <div className="d-flex justify-content-between py-3 border-bottom" style={{ borderColor: 'var(--border-color)' }}>
+              <span className="text-muted">Total Dancers</span>
+              <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{dancers?.length || 0}</span>
             </div>
-
-            <div className="form-group">
-              <label className="form-label">Database Mode</label>
-              <input
-                type="text"
-                className="form-control"
-                value="Browser IndexedDB (Offline & Persistent)"
-                disabled
-                style={{ background: '#f1f5f9', color: '#64748b' }}
-              />
+            <div className="d-flex justify-content-between py-3 border-bottom" style={{ borderColor: 'var(--border-color)' }}>
+              <span className="text-muted">Total Ministries</span>
+              <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{ministries?.length || 0}</span>
             </div>
-
-            <button type="submit" className="btn btn-primary">
-              {savedSuccess ? <><Check size={16} /> Saved!</> : <><Save size={16} /> Save Changes</>}
-            </button>
-          </form>
+            <div className="d-flex justify-content-between py-3 border-bottom" style={{ borderColor: 'var(--border-color)' }}>
+              <span className="text-muted">Total Memberships</span>
+              <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{memberships?.length || 0}</span>
+            </div>
+            <div className="d-flex justify-content-between py-3">
+              <span className="text-muted">Database Version</span>
+              <span className="badge badge-subtle">v3</span>
+            </div>
+          </div>
         </div>
 
-        {/* Database Backup & Maintenance */}
+        {/* System Information */}
         <div className="card">
-          <h3 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Database size={20} className="text-primary" /> Database Backup & Maintenance
-          </h3>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <strong style={{ display: 'block', fontSize: '0.9rem' }}>Export Full Backup</strong>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Download JSON file containing all member records</span>
-              </div>
-              <button className="btn btn-secondary btn-sm" onClick={handleExportBackup}>
-                <Download size={14} /> Export JSON
-              </button>
+          <div className="card-header">
+            <h3 className="card-title"><Shield size={20} style={{ color: '#9ca3af' }} /> System Information</h3>
+          </div>
+          <div className="clean-list">
+            <div className="d-flex justify-content-between py-3 border-bottom" style={{ borderColor: 'var(--border-color)' }}>
+              <span className="text-muted">App Name</span>
+              <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>GH Dance Ministers Database</span>
             </div>
+            <div className="d-flex justify-content-between py-3 border-bottom" style={{ borderColor: 'var(--border-color)' }}>
+              <span className="text-muted">Version</span>
+              <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>Phase 1 (Local)</span>
+            </div>
+            <div className="d-flex justify-content-between py-3">
+              <span className="text-muted">Storage</span>
+              <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>IndexedDB (Browser)</span>
+            </div>
+            <div className="mt-3 p-3" style={{ background: '#f8fafc', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+              <strong>Note:</strong> Phase 2 will include Supabase cloud database, authentication, and multi-admin access.
+            </div>
+          </div>
+        </div>
 
-            <div style={{ background: '#fff1f2', border: '1px solid #fecdd3', padding: '1rem', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <strong style={{ display: 'block', fontSize: '0.9rem', color: '#be123c' }}>Reset Seed Data</strong>
-                <span style={{ fontSize: '0.8rem', color: '#9f1239' }}>Restore fresh default sample records</span>
-              </div>
-              <button className="btn btn-danger btn-sm" onClick={handleResetData}>
-                <RefreshCw size={14} /> Reset Data
+        {/* Export & Backup */}
+        <div className="card">
+          <div className="card-header">
+            <h3 className="card-title"><HardDrive size={20} style={{ color: '#9ca3af' }} /> Export & Backup</h3>
+          </div>
+          <div className="mt-2">
+            <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
+              Download a complete JSON backup of all dancers, ministries, memberships, and import history. Keep this safe.
+            </p>
+            <button className="btn btn-primary" onClick={handleExportData} style={{ width: '100%', padding: '0.85rem' }}>
+              <Download size={18} /> Export Full Database Backup
+            </button>
+          </div>
+        </div>
+
+        {/* Data Management (Destructive) */}
+        <div className="card" style={{ border: '1px solid #fecdd3' }}>
+          <div className="card-header">
+            <h3 className="card-title" style={{ color: 'var(--danger-text)' }}><AlertTriangle size={20} /> Danger Zone</h3>
+          </div>
+          <div className="mt-2">
+            <button className="btn btn-secondary mb-4" onClick={handleRefresh} style={{ width: '100%', padding: '0.85rem' }}>
+              <RefreshCw size={18} /> Refresh Local Data
+            </button>
+            <div style={{ padding: '1.25rem', backgroundColor: '#fff1f2', borderRadius: 'var(--radius-md)', border: '1px solid #fecaca' }}>
+              <p style={{ color: '#be123c', margin: '0 0 1.25rem 0', fontSize: '0.85rem', fontWeight: 500 }}>
+                <strong>WARNING:</strong> This action cannot be undone. All dancers, ministries, and memberships will be permanently deleted from this browser.
+              </p>
+              <button className="btn btn-danger" onClick={handleClearData} style={{ width: '100%', padding: '0.85rem', background: '#e11d48', color: 'white', border: 'none' }}>
+                <Trash2 size={18} /> Clear All Data
               </button>
             </div>
           </div>
         </div>
+
       </div>
     </div>
   );
