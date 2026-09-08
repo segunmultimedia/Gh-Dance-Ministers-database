@@ -125,7 +125,7 @@ export default function Dashboard({
     // 4. Recent Activity
     const recentActivity = [...dancers]
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-      .slice(0, 10)
+      .slice(0, 5)
       .map(d => {
         const primaryMinistry = getDancerPrimaryMinistry(d.id, memberships, ministries);
         const daysAgo = Math.floor((new Date() - new Date(d.createdAt)) / (1000 * 60 * 60 * 24));
@@ -157,13 +157,13 @@ export default function Dashboard({
           </p>
         </div>
         <div className="hero-actions">
-          <button className="btn btn-white" onClick={onNavigateToDancers}>
+          <button className="btn btn-secondary" onClick={onNavigateToDancers}>
             Register New Dancer
           </button>
         </div>
       </div>
 
-      {/* Birthday Highlight (replaces alert) */}
+      {/* Birthday Highlight */}
       {stats.todayBirthdays > 0 && (
         <div className="birthday-highlight">
           <div className="birthday-highlight-text">
@@ -213,40 +213,28 @@ export default function Dashboard({
           </div>
           <div className="stat-card-value">{stats.newDancers}</div>
         </div>
-        <div className="stat-card">
-          <div className="stat-card-header">
-            <span className="stat-card-title">New Ministries</span>
-            <div className="stat-card-icon" style={{ color: '#0284c7', background: '#e0f2fe' }}><Sparkles size={18} /></div>
-          </div>
-          <div className="stat-card-value">{stats.newMinistries}</div>
-        </div>
       </div>
 
-      {/* Analytics Layout */}
-      <div className="dashboard-grid">
+      {/* FIXED DASHBOARD ANALYTICS LOWER SECTION */}
+      <div className="dashboard-analytics">
         
-        {/* Left Column */}
-        <div className="d-flex flex-column gap-4">
-          
-          {/* Registration Activity */}
+        {/* ROW 1 */}
+        <div className="da-row-1">
+          {/* Registration Activity Chart */}
           <div className="card">
             <div className="card-header">
-              <h3 className="card-title"><Activity size={20} className="text-muted" style={{ color: '#9ca3af' }}/> Registration Activity</h3>
+              <h3 className="card-title"><Activity size={20} className="text-muted" /> Registration Activity</h3>
             </div>
-            <div className="chart-container">
+            <div className="da-chart-container">
               {Math.max(...monthlyRegistrations.map(m => m.count)) === 0 ? (
-                <div className="empty-state w-100">
-                  No registration activity this year.
-                </div>
+                <div className="empty-state w-100" style={{ width: '100%' }}>No registration activity this year.</div>
               ) : (
                 monthlyRegistrations.map((m, i) => (
-                  <div key={i} className="chart-bar-wrapper">
-                    <div className="chart-bar-container">
-                      <div className={`chart-bar ${m.isCurrentMonth ? 'active' : ''}`} style={{ 
-                        height: m.height
-                      }} title={`${m.count} registrations`} />
+                  <div key={i} className="da-chart-col">
+                    <div className="da-chart-bar-wrapper">
+                      <div className="da-chart-bar" style={{ height: m.height }} title={`${m.count} registrations`}></div>
                     </div>
-                    <span className="chart-label">{m.month}</span>
+                    <span className="da-chart-label">{m.month}</span>
                   </div>
                 ))
               )}
@@ -256,101 +244,116 @@ export default function Dashboard({
           {/* Recent Registrations */}
           <div className="card">
             <div className="card-header">
-              <h3 className="card-title"><Calendar size={20} style={{ color: '#9ca3af' }}/> Recent Registrations</h3>
+              <h3 className="card-title"><Calendar size={20} className="text-muted" /> Recent Registrations</h3>
+              <button className="btn-ghost btn-sm" onClick={onNavigateToDancers} style={{ fontSize: '0.8rem', padding: 0 }}>View All</button>
             </div>
-            <div className="clean-list">
-              {recentActivity.length === 0 ? <p className="empty-state">No recent activity</p> : null}
-              {recentActivity.map((d) => (
-                <div key={d.id} className="clean-list-item" onClick={() => onViewDancer(d)}>
-                  <div className="list-avatar" style={{ background: '#dcfce7', color: '#16a34a' }}>{d.name.charAt(0)}</div>
-                  <div className="d-flex flex-column" style={{ flex: 1 }}>
-                    <span className="list-avatar-text">{d.name}</span>
-                    <span className="list-avatar-sub">{d.ministryName}</span>
+            <div className="da-list pb-2">
+              {recentActivity.length === 0 ? (
+                <div className="empty-state">No recent activity.</div>
+              ) : (
+                recentActivity.map((d) => (
+                  <div key={d.id} className="da-list-item" onClick={() => onViewDancer(d)}>
+                    <div className="da-list-left">
+                      <div className="avatar">{d.name.charAt(0).toUpperCase()}</div>
+                      <div className="da-list-text">
+                        <span className="da-list-title">{d.name}</span>
+                        <span className="da-list-subtitle">{d.ministryName}</span>
+                      </div>
+                    </div>
+                    <div className="da-list-right">
+                      <span className="da-time">{d.timeStr}</span>
+                    </div>
                   </div>
-                  <div className="d-flex flex-column">
-                    <span className="list-right-text">{d.timeStr}</span>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
-
         </div>
 
-        {/* Right Column */}
-        <div className="d-flex flex-column gap-4">
-          
+        {/* ROW 2 */}
+        <div className="da-row-2">
           {/* Upcoming Birthdays */}
           <div className="card">
             <div className="card-header">
-              <h3 className="card-title"><Cake size={20} style={{ color: '#9ca3af' }}/> Upcoming Birthdays</h3>
-              <button className="btn btn-sm" onClick={onNavigateToBirthdays} style={{ color: 'var(--primary)', fontWeight: 600, background: 'transparent', border: 'none', padding: 0 }}>View All</button>
+              <h3 className="card-title"><Cake size={20} className="text-muted" /> Upcoming Birthdays</h3>
+              <button className="btn-ghost btn-sm" onClick={onNavigateToBirthdays} style={{ fontSize: '0.8rem', padding: 0 }}>View All</button>
             </div>
-            <div className="clean-list">
-              {nextBirthdays.length === 0 ? <p className="empty-state">No upcoming birthdays</p> : null}
-              {nextBirthdays.map((d) => (
-                <div key={d.id} className="clean-list-item" onClick={() => onViewDancer(d)}>
-                  <div className="list-avatar">{d.name.charAt(0)}</div>
-                  <div className="d-flex flex-column" style={{ flex: 1 }}>
-                    <div className="d-flex align-items-center gap-2">
-                      <span className="list-avatar-text" style={{ margin: 0 }}>{d.name}</span>
-                      <div className={`dot-indicator ${d.allowBirthdayPublication ? 'dot-success' : 'dot-danger'}`} title={d.allowBirthdayPublication ? "Published" : "Private"} />
+            <div className="da-list pb-2">
+              {nextBirthdays.length === 0 ? (
+                <div className="empty-state">No upcoming birthdays.</div>
+              ) : (
+                nextBirthdays.map((d) => (
+                  <div key={d.id} className="da-list-item" onClick={() => onViewDancer(d)}>
+                    <div className="da-list-left">
+                      <div className="avatar">{d.name.charAt(0).toUpperCase()}</div>
+                      <div className="da-list-text">
+                        <span className="da-list-title">{d.name}</span>
+                        <span className="da-list-subtitle">{d.ministryName}</span>
+                      </div>
                     </div>
-                    <span className="list-avatar-sub">{d.ministryName}</span>
+                    <div className="da-list-right" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.15rem' }}>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>{d.bDayInfo.formattedBirthday}</span>
+                      {d.bDayInfo.daysUntil === 0 ? (
+                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--danger)' }}>Today</span>
+                      ) : d.bDayInfo.daysUntil === 1 ? (
+                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--warning)' }}>Tomorrow</span>
+                      ) : (
+                        <span className="da-time">In {d.bDayInfo.daysUntil} days</span>
+                      )}
+                    </div>
                   </div>
-                  <div className="d-flex flex-column" style={{ textAlign: 'right' }}>
-                    <span className="list-right-text">{d.bDayInfo.formattedBirthday}</span>
-                    <span className="list-right-sub" style={{ color: d.bDayInfo.daysUntil === 0 ? '#e11d48' : 'var(--text-muted)' }}>
-                      {d.bDayInfo.daysUntil === 0 ? 'Today' : d.bDayInfo.daysUntil === 1 ? 'Tomorrow' : `In ${d.bDayInfo.daysUntil} days`}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
 
-          {/* Ministry Distribution */}
+          {/* Top Ministries */}
           <div className="card">
             <div className="card-header">
-              <h3 className="card-title"><Building2 size={20} style={{ color: '#9ca3af' }}/> Top Ministries</h3>
+              <h3 className="card-title"><Building2 size={20} className="text-muted" /> Top Ministries</h3>
             </div>
-            <div className="dist-list">
-              {topMinistries.length === 0 ? <p className="empty-state">No ministries data</p> : null}
-              {topMinistries.map((m, i) => (
-                <div key={m.id} className="dist-row">
-                  <div className="dist-header">
-                    <span className="dist-label">{m.name}</span>
-                    <span className="dist-value">{m.memberCount} dancer{m.memberCount !== 1 ? 's' : ''}</span>
+            <div className="da-list py-2" style={{ gap: '0' }}>
+              {topMinistries.length === 0 ? (
+                <div className="empty-state">No ministries data.</div>
+              ) : (
+                topMinistries.map((m) => (
+                  <div key={m.id} className="da-progress-row">
+                    <div className="da-progress-header">
+                      <span className="da-progress-title">{m.name}</span>
+                      <span className="da-progress-value">{m.memberCount} dancer{m.memberCount !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div className="da-progress-track">
+                      <div className="da-progress-bar" style={{ width: `${m.percent}%` }}></div>
+                    </div>
                   </div>
-                  <div className="dist-track">
-                    <div className="dist-bar" style={{ width: `${m.percent}%` }} />
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
 
-          {/* Region Distribution */}
+          {/* Top Regions */}
           <div className="card">
             <div className="card-header">
-              <h3 className="card-title"><MapPin size={20} style={{ color: '#9ca3af' }}/> Top Regions</h3>
+              <h3 className="card-title"><MapPin size={20} className="text-muted" /> Top Regions</h3>
             </div>
-            <div className="dist-list">
-              {topRegions.length === 0 ? <p className="empty-state">No region data</p> : null}
-              {topRegions.map((r, i) => (
-                <div key={r.region} className="dist-row">
-                  <div className="dist-header">
-                    <span className="dist-label">{r.region}</span>
-                    <span className="dist-value">{r.count} dancer{r.count !== 1 ? 's' : ''}</span>
+            <div className="da-list py-2" style={{ gap: '0' }}>
+              {topRegions.length === 0 ? (
+                <div className="empty-state">No region data.</div>
+              ) : (
+                topRegions.map((r) => (
+                  <div key={r.region} className="da-progress-row">
+                    <div className="da-progress-header">
+                      <span className="da-progress-title">{r.region}</span>
+                      <span className="da-progress-value">{r.count} dancer{r.count !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div className="da-progress-track">
+                      <div className="da-progress-bar" style={{ width: `${r.percent}%` }}></div>
+                    </div>
                   </div>
-                  <div className="dist-track">
-                    <div className="dist-bar" style={{ width: `${r.percent}%` }} />
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
-
         </div>
 
       </div>
