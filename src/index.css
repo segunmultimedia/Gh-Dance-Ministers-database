@@ -347,3 +347,95 @@ select.form-control { padding-right: 2rem; appearance: none; background-image: u
   background: var(--primary);
   border-radius: 2px;
 }
+
+/* Settings Page Specifics */
+.settings-page {
+  max-width: 1100px;
+  margin: 0 auto;
+  width: 100%;
+}
+.sp-description {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  margin-bottom: 2.5rem;
+}
+.sp-section {
+  margin-bottom: 2rem;
+}
+.sp-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+@media (max-width: 1024px) {
+  .sp-grid-4 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+  .sp-grid-4 { grid-template-columns: 1fr; }
+}
+.sp-stat-card {
+  padding: 1.25rem;
+  border-right: 1px solid var(--border);
+}
+.sp-stat-card:last-child {
+  border-right: none;
+}
+@media (max-width: 1024px) {
+  .sp-stat-card { border-right: none; border-bottom: 1px solid var(--border); }
+  .sp-stat-card:last-child { border-bottom: none; }
+}
+.sp-stat-label {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+.sp-stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+.sp-list-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+.sp-list-row:last-child {
+  border-bottom: none;
+}
+.sp-list-label {
+  font-weight: 500;
+  color: var(--text-muted);
+}
+.sp-list-value {
+  font-weight: 600;
+  color: var(--text-main);
+}
+.sp-note {
+  background: var(--bg-hover);
+  padding: 1rem 1.5rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+.sp-danger-zone {
+  background: var(--danger-bg);
+  border: 1px solid #fecaca;
+}
+.sp-danger-zone .card-header {
+  background: transparent;
+  border-bottom-color: #fecaca;
+}
+.sp-danger-title {
+  color: var(--danger-hover);
+}
+.sp-btn-outline-danger {
+  background: transparent;
+  color: var(--danger-hover);
+  border: 1px solid var(--danger-hover);
+}
+.sp-btn-outline-danger:hover {
+  background: var(--danger-hover);
+  color: white;
+}
