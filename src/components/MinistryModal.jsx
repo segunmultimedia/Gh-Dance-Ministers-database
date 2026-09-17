@@ -3,7 +3,7 @@ import { X, Building2, Camera, Upload } from 'lucide-react';
 import { GHANA_REGIONS } from '../utils/constants';
 import { resizeAndCompressImage } from '../utils/imageUtils';
 
-export default function MinistryModal({ isOpen, onClose, onSave, ministryToEdit, dancers, memberships, ministries = [] }) {
+export default function MinistryModal({ isOpen, onClose, onSave, ministryToEdit, dancers = [], memberships = [], ministries = [] }) {
   const [formData, setFormData] = useState({
     name: '',
     church: '',
@@ -14,12 +14,15 @@ export default function MinistryModal({ isOpen, onClose, onSave, ministryToEdit,
     region: '',
     dateEstablished: '',
     status: 'active',
-    notes: '',
-    logo: ''
+    notes: ''
   });
   
   const [selectedLeaderId, setSelectedLeaderId] = useState('');
   const [selectedAssistantLeaderId, setSelectedAssistantLeaderId] = useState('');
+  const [newLeaderName, setNewLeaderName] = useState('');
+  const [newLeaderPhone, setNewLeaderPhone] = useState('');
+  const [newAssistantName, setNewAssistantName] = useState('');
+  const [newAssistantPhone, setNewAssistantPhone] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef(null);
 
@@ -83,26 +86,42 @@ export default function MinistryModal({ isOpen, onClose, onSave, ministryToEdit,
   };
 
   const handleSubmit = (e) => {
-    e.preventDefault();
-    const minName = formData.name.trim();
-    if (!minName) {
-      alert("Ministry Name is required");
+    e?.preventDefault();
+    if (!formData.name.trim()) {
+      alert("Ministry name is required");
       return;
     }
 
-    if (!ministryToEdit) {
-      const isDuplicate = ministries.some(m => m.name.toLowerCase().trim() === minName.toLowerCase());
-      if (isDuplicate) {
-        if (!window.confirm(`A ministry named "${minName}" already exists. Are you sure you want to create a duplicate?`)) {
-          return;
-        }
+    if (ministries.some(m => m.name.toLowerCase() === formData.name.trim().toLowerCase() && (!ministryToEdit || m.id !== ministryToEdit.id))) {
+      alert("A ministry with this name already exists");
+      return;
+    }
+
+    let newLeaderData = null;
+    let newAssistantData = null;
+
+    if (selectedLeaderId === 'ADD_NEW') {
+      if (!newLeaderName.trim() || !newLeaderPhone.trim()) {
+        alert("Please enter Name and Phone for the new Ministry Leader");
+        return;
       }
+      newLeaderData = { name: newLeaderName, phone: newLeaderPhone, dancerType: 'group_member', status: 'Active' };
+    }
+
+    if (selectedAssistantLeaderId === 'ADD_NEW') {
+      if (!newAssistantName.trim() || !newAssistantPhone.trim()) {
+        alert("Please enter Name and Phone for the new Assistant Leader");
+        return;
+      }
+      newAssistantData = { name: newAssistantName, phone: newAssistantPhone, dancerType: 'group_member', status: 'Active' };
     }
 
     onSave({
       ministryData: formData,
-      leaderId: selectedLeaderId,
-      assistantLeaderId: selectedAssistantLeaderId
+      leaderId: selectedLeaderId === 'ADD_NEW' ? null : selectedLeaderId,
+      assistantLeaderId: selectedAssistantLeaderId === 'ADD_NEW' ? null : selectedAssistantLeaderId,
+      newLeaderData,
+      newAssistantData
     });
   };
 
@@ -148,7 +167,7 @@ export default function MinistryModal({ isOpen, onClose, onSave, ministryToEdit,
               <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>Basic Information</h3>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.25rem' }}>
                 <div className="form-group mb-0">
-                  <label className="form-label">Ministry Name *</label>
+                  <label className="form-label">Ministry Name</label>
                   <input type="text" className="form-control" name="name" value={formData.name} onChange={handleChange} required placeholder="E.g., Anointed Vessels" />
                 </div>
                 <div className="form-group mb-0">
@@ -166,19 +185,33 @@ export default function MinistryModal({ isOpen, onClose, onSave, ministryToEdit,
                   <label className="form-label">Ministry Leader</label>
                   <select className="form-control" value={selectedLeaderId} onChange={(e) => setSelectedLeaderId(e.target.value)}>
                     <option value="">-- Select Leader --</option>
+                    <option value="ADD_NEW">+ Add New Leader</option>
                     {dancers.map(d => (
                       <option key={d.id} value={d.id}>{d.name} {d.phone ? `(${d.phone})` : ''}</option>
                     ))}
                   </select>
+                  {selectedLeaderId === 'ADD_NEW' && (
+                    <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem' }}>
+                      <input type="text" className="form-control" placeholder="Leader Name" value={newLeaderName} onChange={e => setNewLeaderName(e.target.value)} required />
+                      <input type="text" className="form-control" placeholder="Phone" value={newLeaderPhone} onChange={e => setNewLeaderPhone(e.target.value)} required />
+                    </div>
+                  )}
                 </div>
                 <div className="form-group mb-0">
                   <label className="form-label">Assistant Leader</label>
                   <select className="form-control" value={selectedAssistantLeaderId} onChange={(e) => setSelectedAssistantLeaderId(e.target.value)}>
                     <option value="">-- Select Assistant --</option>
+                    <option value="ADD_NEW">+ Add New Leader</option>
                     {dancers.map(d => (
                       <option key={d.id} value={d.id}>{d.name} {d.phone ? `(${d.phone})` : ''}</option>
                     ))}
                   </select>
+                  {selectedAssistantLeaderId === 'ADD_NEW' && (
+                    <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem' }}>
+                      <input type="text" className="form-control" placeholder="Assistant Name" value={newAssistantName} onChange={e => setNewAssistantName(e.target.value)} required />
+                      <input type="text" className="form-control" placeholder="Phone" value={newAssistantPhone} onChange={e => setNewAssistantPhone(e.target.value)} required />
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

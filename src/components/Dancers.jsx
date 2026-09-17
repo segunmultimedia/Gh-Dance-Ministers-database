@@ -7,7 +7,7 @@ import { getBirthdayInfo } from '../utils/birthdayUtils';
 
 export default function Dancers({ 
   dancers, ministries, memberships,
-  onEditDancer, onViewDancer, onDeleteDancer, onDeactivateDancer, onExportCsv, searchTerm
+  onEditDancer, onViewDancer, onDeleteDancer, onToggleDancerStatus, onExportCsv, searchTerm
 }) {
   const [regionFilter, setRegionFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
@@ -44,22 +44,12 @@ export default function Dancers({
   const allRolesList = Array.from(new Set(memberships.flatMap(m => m.roles)));
 
   const handleDelete = (dancer) => {
-    const isDeletable = canDeleteDancer(dancer.id);
-    if (isDeletable) {
-      if (window.confirm(`Are you sure you want to completely delete ${dancer.name}?`)) onDeleteDancer(dancer);
-    } else {
-      if (window.confirm(`Cannot delete ${dancer.name} because they have history. Deactivate them instead?`)) onDeactivateDancer(dancer.id);
-    }
+    onDeleteDancer(dancer.id);
     setActiveMenuId(null);
   };
 
   const handleToggleStatus = (dancer) => {
-    if (dancer.status === 'Active') {
-      if (window.confirm(`Deactivate ${dancer.name}?`)) onDeactivateDancer(dancer.id);
-    } else {
-      alert("Please edit the dancer to reactivate them.");
-      onEditDancer(dancer);
-    }
+    onToggleDancerStatus(dancer);
     setActiveMenuId(null);
   };
 
@@ -129,7 +119,7 @@ export default function Dancers({
                   const menuOpen = activeMenuId === dancer.id;
 
                   return (
-                    <tr key={dancer.id} style={{ opacity: isActive ? 1 : 0.6 }}>
+                    <tr key={dancer.id} style={{ opacity: isActive ? 1 : 0.6, position: 'relative', zIndex: menuOpen ? 50 : 1 }}>
                       <td>
                         <div className="cell-identity">
                           <div className="avatar">
@@ -187,10 +177,10 @@ export default function Dancers({
                             <>
                               <div className="action-overlay" onClick={() => setActiveMenuId(null)}></div>
                               <div className="action-dropdown">
-                                <button onClick={() => { onViewDancer(dancer); setActiveMenuId(null); }}><Eye size={16} /> View Profile</button>
-                                <button onClick={() => { onEditDancer(dancer); setActiveMenuId(null); }}><Edit3 size={16} /> Edit Dancer</button>
-                                <button onClick={() => handleToggleStatus(dancer)}><UserMinus size={16} /> {isActive ? 'Deactivate' : 'Reactivate'}</button>
-                                {canDeleteDancer(dancer.id) && <button className="danger" onClick={() => handleDelete(dancer)}><Trash2 size={16} /> Delete</button>}
+                            <button onClick={() => { onViewDancer(dancer); setActiveMenuId(null); }}><Eye size={16} /> View Profile</button>
+                            <button onClick={() => { onEditDancer(dancer); setActiveMenuId(null); }}><Edit3 size={16} /> Edit Dancer</button>
+                            <button onClick={() => handleToggleStatus(dancer)}><UserMinus size={16} /> {isActive ? 'Deactivate' : 'Reactivate'}</button>
+                            <button className="danger" onClick={() => handleDelete(dancer)}><Trash2 size={16} /> Delete</button>
                               </div>
                             </>
                           )}
@@ -211,7 +201,7 @@ export default function Dancers({
               const menuOpen = activeMenuId === dancer.id;
 
               return (
-                <div key={dancer.id} className="data-grid-card" style={{ opacity: isActive ? 1 : 0.6 }}>
+                <div key={dancer.id} className="data-grid-card" style={{ opacity: isActive ? 1 : 0.6, position: 'relative', zIndex: menuOpen ? 50 : 1 }}>
                   <div className="d-flex justify-between align-center">
                     <div className="cell-identity">
                       <div className="avatar">
@@ -231,7 +221,7 @@ export default function Dancers({
                             <button onClick={() => { onViewDancer(dancer); setActiveMenuId(null); }}><Eye size={16} /> View Profile</button>
                             <button onClick={() => { onEditDancer(dancer); setActiveMenuId(null); }}><Edit3 size={16} /> Edit Dancer</button>
                             <button onClick={() => handleToggleStatus(dancer)}><UserMinus size={16} /> {isActive ? 'Deactivate' : 'Reactivate'}</button>
-                            {canDeleteDancer(dancer.id) && <button className="danger" onClick={() => handleDelete(dancer)}><Trash2 size={16} /> Delete</button>}
+                            <button className="danger" onClick={() => handleDelete(dancer)}><Trash2 size={16} /> Delete</button>
                           </div>
                         </>
                       )}

@@ -61,7 +61,10 @@ export default function Sidebar({
               <button key={item.id} className={`sidebar-link ${isActive ? 'active' : ''}`} onClick={() => handleTabClick(item.id)} style={{ background: 'transparent', border: 'none', width: '100%' }}>
                 <div className="sidebar-link-content">
                   <Icon size={18} />
-                  <span>{item.label}</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                    <span>{item.label}</span>
+                    {item.subtext && <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1 }}>{item.subtext}</span>}
+                  </div>
                 </div>
                 {item.badge !== undefined && item.badge > 0 && (
                   <span className={`badge ${item.isAlert ? 'badge-orange' : ''}`} style={{ border: 'none', background: isActive ? 'white' : 'var(--bg-app)' }}>{item.badge}</span>
@@ -106,3 +109,4 @@ export default function Sidebar({
     </>
   );
 }
+

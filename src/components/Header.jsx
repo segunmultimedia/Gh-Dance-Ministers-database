@@ -6,6 +6,7 @@ export default function Header({
   searchTerm,
   setSearchTerm,
   onOpenAddDancer,
+  onOpenAddMinistry,
   toggleMobileMenu,
   birthdayNotificationsCount = 0
 }) {
@@ -56,6 +57,12 @@ export default function Header({
         {activeTab === 'dancers' && (
           <button className="btn btn-primary btn-sm" onClick={onOpenAddDancer}>
             <Plus size={16} /> <span className="hide-mobile">Register Dancer</span>
+          </button>
+        )}
+
+        {activeTab === 'ministries' && (
+          <button className="btn btn-primary btn-sm" onClick={onOpenAddMinistry}>
+            <Plus size={16} /> <span className="hide-mobile">Register Ministry</span>
           </button>
         )}
       </div>

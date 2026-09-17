@@ -56,6 +56,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [searchTerm, setSearchTerm] = useState('');
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [notification, setNotification] = useState('');
 
   // Data state
   const [dancers, setDancers] = useState([]);
@@ -214,6 +215,9 @@ export default function App() {
     setIsDancerModalOpen(false);
     setDancerToEdit(null);
     await refreshAllData();
+    
+    setNotification('Dancer registered successfully.');
+    setTimeout(() => setNotification(''), 3000);
   };
 
   const handleDeleteDancer = async (id) => {
@@ -225,9 +229,17 @@ export default function App() {
       }
     } else {
       if (confirm('This dancer has active ministry memberships. Deactivate instead of delete?')) {
-        await deactivateDancer(id);
+        await updateDancer(id, { status: 'Inactive' });
         await refreshAllData();
       }
+    }
+  };
+
+  const handleToggleDancerStatus = async (dancer) => {
+    const newStatus = dancer.status === 'Active' ? 'Inactive' : 'Active';
+    if (confirm(`Change status of ${dancer.name} to ${newStatus}?`)) {
+      await updateDancer(dancer.id, { status: newStatus });
+      await refreshAllData();
     }
   };
 
@@ -242,8 +254,10 @@ export default function App() {
     setIsMinistryModalOpen(true);
   };
 
-  const handleSaveMinistry = async ({ ministryData, leaderId, assistantLeaderId }) => {
+  const handleSaveMinistry = async ({ ministryData, leaderId, assistantLeaderId, newLeaderData, newAssistantData }) => {
     let ministryId;
+    let finalLeaderId = leaderId;
+    let finalAssistantId = assistantLeaderId;
 
     if (ministryToEdit) {
       await updateMinistry(ministryToEdit.id, ministryData);
@@ -253,12 +267,22 @@ export default function App() {
       ministryId = newMinistry.id;
     }
 
+    if (newLeaderData) {
+      const d = await addDancer({ ...newLeaderData, phone: normalizeGhanaPhone(newLeaderData.phone) });
+      finalLeaderId = d.id;
+    }
+
+    if (newAssistantData) {
+      const d = await addDancer({ ...newAssistantData, phone: normalizeGhanaPhone(newAssistantData.phone) });
+      finalAssistantId = d.id;
+    }
+
     // Handle leader assignment
-    if (leaderId) {
+    if (finalLeaderId) {
       const existingLeader = memberships.find(
         m => m.ministryId === ministryId && (m.roles || []).includes('ministry_leader') && m.status === 'active'
       );
-      if (existingLeader && existingLeader.dancerId !== leaderId) {
+      if (existingLeader && existingLeader.dancerId !== finalLeaderId) {
         // Remove old leader role
         const newRoles = (existingLeader.roles || []).filter(r => r !== 'ministry_leader');
         if (newRoles.length > 0) {
@@ -269,7 +293,7 @@ export default function App() {
       }
       // Assign new leader
       const existingMembership = memberships.find(
-        m => m.ministryId === ministryId && m.dancerId === leaderId && m.status === 'active'
+        m => m.ministryId === ministryId && m.dancerId === finalLeaderId && m.status === 'active'
       );
       if (existingMembership) {
         const roles = new Set(existingMembership.roles || []);
@@ -278,22 +302,36 @@ export default function App() {
         await updateMembership(existingMembership.id, { roles: Array.from(roles) });
       } else {
         await addMembership({
-          dancerId: leaderId,
+          dancerId: finalLeaderId,
           ministryId,
           roles: ['dancer', 'ministry_leader'],
-          isPrimary: false,
-          dateJoined: '',
+          isPrimary: true,
+          dateJoined: new Date().toISOString().slice(0, 10),
           status: 'active',
         });
       }
+    } else {
+      // Remove any existing leader if no leader selected
+      const existingLeader = memberships.find(
+        m => m.ministryId === ministryId && (m.roles || []).includes('ministry_leader') && m.status === 'active'
+      );
+      if (existingLeader) {
+        const newRoles = (existingLeader.roles || []).filter(r => r !== 'ministry_leader');
+        if (newRoles.length > 0) {
+          await updateMembership(existingLeader.id, { roles: newRoles });
+        } else {
+          await removeMembership(existingLeader.id);
+        }
+      }
     }
 
-    // Handle assistant leader assignment
-    if (assistantLeaderId) {
+    // Handle assistant assignment
+    if (finalAssistantId) {
       const existingAssistant = memberships.find(
         m => m.ministryId === ministryId && (m.roles || []).includes('assistant_leader') && m.status === 'active'
       );
-      if (existingAssistant && existingAssistant.dancerId !== assistantLeaderId) {
+      if (existingAssistant && existingAssistant.dancerId !== finalAssistantId) {
+        // Remove old assistant role
         const newRoles = (existingAssistant.roles || []).filter(r => r !== 'assistant_leader');
         if (newRoles.length > 0) {
           await updateMembership(existingAssistant.id, { roles: newRoles });
@@ -301,21 +339,21 @@ export default function App() {
           await removeMembership(existingAssistant.id);
         }
       }
+      // Assign new assistant
       const existingMembership = memberships.find(
-        m => m.ministryId === ministryId && m.dancerId === assistantLeaderId && m.status === 'active'
+        m => m.ministryId === ministryId && m.dancerId === finalAssistantId && m.status === 'active'
       );
       if (existingMembership) {
         const roles = new Set(existingMembership.roles || []);
         roles.add('assistant_leader');
-        roles.add('dancer');
         await updateMembership(existingMembership.id, { roles: Array.from(roles) });
       } else {
         await addMembership({
-          dancerId: assistantLeaderId,
+          dancerId: finalAssistantId,
           ministryId,
           roles: ['dancer', 'assistant_leader'],
-          isPrimary: false,
-          dateJoined: '',
+          isPrimary: true,
+          dateJoined: new Date().toISOString().slice(0, 10),
           status: 'active',
         });
       }
@@ -337,6 +375,11 @@ export default function App() {
   const birthdaysTodayCount = dancers.filter(d =>
     getBirthdayInfo(d.birthdayDay, d.birthdayMonth).isToday
   ).length;
+
+  const birthdaysUpcomingCount = dancers.filter(d => {
+    const info = getBirthdayInfo(d.birthdayDay, d.birthdayMonth, d.birthYear);
+    return info.daysUntil !== null && info.daysUntil <= 30;
+  }).length;
 
   const leadersCount = (() => {
     const leaderDancerIds = new Set();
@@ -384,6 +427,7 @@ export default function App() {
           ministries: ministries.filter(m => m.status === 'active').length,
           leaders: leadersCount,
           birthdaysToday: birthdaysTodayCount,
+          birthdaysUpcoming: birthdaysUpcomingCount
         }}
         adminUser={adminUser}
         onLogout={handleLogout}
@@ -397,6 +441,7 @@ export default function App() {
           searchTerm={searchTerm}
           setSearchTerm={setSearchTerm}
           onOpenAddDancer={handleOpenAddDancer}
+          onOpenAddMinistry={handleOpenAddMinistry}
           toggleMobileMenu={() => setIsMobileOpen(!isMobileOpen)}
           birthdayNotificationsCount={birthdaysTodayCount}
         />
@@ -407,9 +452,11 @@ export default function App() {
               dancers={dancers}
               ministries={ministries}
               memberships={memberships}
+              adminUser={adminUser}
               onViewDancer={(d) => setSelectedDancerForDetail(d)}
               onNavigateToBirthdays={() => setActiveTab('birthdays')}
-              onNavigateToDancers={() => { setActiveTab('dancers'); handleOpenAddDancer(); }}
+              onNavigateToDancers={() => { setActiveTab('dancers'); }}
+              onRegisterNewDancer={handleOpenAddDancer}
             />
           )}
 
@@ -423,6 +470,7 @@ export default function App() {
               onViewDancer={(d) => setSelectedDancerForDetail(d)}
               onEditDancer={handleOpenEditDancer}
               onDeleteDancer={handleDeleteDancer}
+              onToggleDancerStatus={handleToggleDancerStatus}
               onOpenAddDancer={handleOpenAddDancer}
             />
           )}
@@ -443,10 +491,10 @@ export default function App() {
               memberships={memberships}
               searchTerm={searchTerm}
               setSearchTerm={setSearchTerm}
-              onOpenAddMinistry={handleOpenAddMinistry}
+              onAddMinistry={handleOpenAddMinistry}
               onEditMinistry={handleOpenEditMinistry}
               onViewMinistry={(m) => { handleOpenEditMinistry(m); }}
-              onDeactivateMinistry={handleDeactivateMinistry}
+              onDeleteMinistry={handleDeactivateMinistry}
             />
           )}
 
@@ -495,6 +543,7 @@ export default function App() {
         dancerToEdit={dancerToEdit}
         ministries={ministries}
         memberships={memberships}
+        dancers={dancers}
         onAddMinistry={() => {
           setIsDancerModalOpen(false);
           setIsMinistryModalOpen(true);
@@ -510,6 +559,7 @@ export default function App() {
         ministries={ministries}
         dancers={dancers}
         memberships={memberships}
+        onAddDancer={handleOpenAddDancer}
       />
 
       {/* Dancer Detail Modal */}
@@ -521,6 +571,23 @@ export default function App() {
         memberships={memberships}
         onEdit={(d) => { setSelectedDancerForDetail(null); handleOpenEditDancer(d); }}
       />
+      {/* Notification Toast */}
+      {notification && (
+        <div style={{
+          position: 'fixed',
+          bottom: '1.5rem',
+          right: '1.5rem',
+          background: '#10b981',
+          color: 'white',
+          padding: '1rem 1.5rem',
+          borderRadius: '8px',
+          boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+          zIndex: 9999,
+          fontWeight: 500
+        }}>
+          {notification}
+        </div>
+      )}
     </div>
   );
 }
